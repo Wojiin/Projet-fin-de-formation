@@ -1,0 +1,11 @@
+api_platform:
+    title: ChirOrg API
+    description: API REST de planification des chirurgies et de préparation du matériel opératoire.
+    version: 1.0.0
+    formats:
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']

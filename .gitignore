@@ -1,0 +1,31 @@
+# Keep the initial repository limited to environment/orchestration files and
+# dependency manifests. Application source, tests, documentation and assets
+# remain local but are deliberately not versioned.
+*
+!.gitignore
+
+!backend/
+!backend/.dockerignore
+!backend/.editorconfig
+!backend/.env
+!backend/.env.dev
+!backend/.env.test
+!backend/compose.yaml
+!backend/Dockerfile
+!backend/phpunit.dist.xml
+!backend/composer.json
+!backend/composer.lock
+!backend/symfony.lock
+
+!backend/config/
+!backend/config/**/
+!backend/config/**/*.yaml
+
+!backend/docker/
+!backend/docker/nginx/
+!backend/docker/nginx/default.conf
+
+# Local/generated dependency and runtime files
+backend/vendor/
+backend/var/
+backend/.phpunit.cache/
