@@ -1,0 +1,60 @@
+@apiUrl = http://localhost:8080/api
+@token = remplacer_par_token
+@chirurgieId = 1
+@preparationId = 1
+
+### Login utilisateur
+POST {{apiUrl}}/login
+Content-Type: application/json
+
+{"email":"user@chirorg.test","password":"password"}
+
+### Login administrateur
+POST {{apiUrl}}/login
+Content-Type: application/json
+
+{"email":"admin@chirorg.test","password":"password"}
+
+### Utilisateur connecté
+GET {{apiUrl}}/me
+Authorization: Bearer {{token}}
+
+### Programme du jour
+GET {{apiUrl}}/programmes-operatoires
+Authorization: Bearer {{token}}
+
+### Programme filtré
+GET {{apiUrl}}/programmes-operatoires?date=2026-07-20&salle=Salle%20A
+Authorization: Bearer {{token}}
+
+### Préparation d'une chirurgie
+GET {{apiUrl}}/chirurgies-planifiees/{{chirurgieId}}/preparation
+Authorization: Bearer {{token}}
+
+### Cocher un matériel
+PATCH {{apiUrl}}/preparations-materiel/{{preparationId}}/cocher
+Authorization: Bearer {{token}}
+Content-Type: application/merge-patch+json
+
+{"coche":true}
+
+### Valider une chirurgie
+POST {{apiUrl}}/chirurgies-planifiees/{{chirurgieId}}/validation
+Authorization: Bearer {{token}}
+
+### Vue finale
+GET {{apiUrl}}/chirurgies-planifiees/{{chirurgieId}}/vue-finale
+Authorization: Bearer {{token}}
+
+### Refresh via cookie HttpOnly conservé par le client HTTP
+POST {{apiUrl}}/token/refresh
+
+### Logout et révocation du refresh token
+POST {{apiUrl}}/logout
+
+### Administration autorisée avec un token admin
+GET {{apiUrl}}/users
+Authorization: Bearer {{token}}
+
+### Exemple d'accès refusé sans JWT
+GET {{apiUrl}}/programmes-operatoires
