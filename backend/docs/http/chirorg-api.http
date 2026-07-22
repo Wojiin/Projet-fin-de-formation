@@ -2,6 +2,9 @@
 @token = remplacer_par_token
 @chirurgieId = 1
 @preparationId = 1
+@programmeDate = 2026-07-20
+@programmeSalle = Salle%20A
+@programmeChirurgienId = 1
 
 ### Login utilisateur
 POST {{apiUrl}}/login
@@ -25,6 +28,14 @@ Authorization: Bearer {{token}}
 
 ### Programme filtré
 GET {{apiUrl}}/programmes-operatoires?date=2026-07-20&salle=Salle%20A
+Authorization: Bearer {{token}}
+
+### Détail d'un programme : chirurgies et checklist
+GET {{apiUrl}}/programmes-operatoires/{{programmeDate}}/{{programmeSalle}}/{{programmeChirurgienId}}
+Authorization: Bearer {{token}}
+
+### Vue finale d'un programme : chirurgies validées et fiches techniques
+GET {{apiUrl}}/programmes-operatoires/{{programmeDate}}/{{programmeSalle}}/{{programmeChirurgienId}}/vue-finale
 Authorization: Bearer {{token}}
 
 ### Préparation d'une chirurgie

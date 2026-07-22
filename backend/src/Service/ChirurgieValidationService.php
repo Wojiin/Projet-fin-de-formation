@@ -4,8 +4,8 @@ namespace App\Service;
 
 use App\Entity\ChirurgiePlanifiee;
 use App\Entity\User;
+use App\Exception\ApiProblemException;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final readonly class ChirurgieValidationService
 {
@@ -20,12 +20,12 @@ final readonly class ChirurgieValidationService
         }
 
         if ($chirurgie->getPreparationsMateriel()->isEmpty()) {
-            throw new ConflictHttpException('La chirurgie ne possède aucune préparation de matériel.');
+            throw new ApiProblemException('MATERIEL_PREPARATION_INCOMPLETE', 'La chirurgie ne possède aucune préparation de matériel.');
         }
 
         foreach ($chirurgie->getPreparationsMateriel() as $preparation) {
             if (!$preparation->isCoche()) {
-                throw new ConflictHttpException('Tout le matériel doit être coché avant la validation.');
+                throw new ApiProblemException('MATERIEL_PREPARATION_INCOMPLETE', 'Tout le matériel doit être coché avant la validation.');
             }
         }
 

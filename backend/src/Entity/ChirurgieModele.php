@@ -3,14 +3,14 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Doctrine\Orm\Filter\PartialSearchFilter;
+use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
-use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use App\Repository\ChirurgieModeleRepository;
 use App\State\ReferenceDeleteProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -24,14 +24,15 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'Référentiel des interventions ou chirurgies modèles.',
     operations: [
-        new GetCollection(uriTemplate: '/chirurgie-modeles', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_modele:list']], openapi: new OpenApiOperation(summary: 'Lister les chirurgies modèles', description: 'Retourne le référentiel des interventions types disponibles pour la planification.')),
+        new GetCollection(uriTemplate: '/chirurgie-modeles', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_modele:list']], parameters: [
+            'intitule' => new QueryParameter(property: 'intitule', filter: new PartialSearchFilter()),
+        ], openapi: new OpenApiOperation(summary: 'Lister les chirurgies modèles', description: 'Retourne le référentiel des interventions types disponibles pour la planification.')),
         new Get(uriTemplate: '/chirurgie-modeles/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_modele:read']], openapi: new OpenApiOperation(summary: 'Consulter une chirurgie modèle', description: 'Retourne le détail d’une intervention type à partir de son identifiant.')),
         new Post(uriTemplate: '/chirurgie-modeles', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['chirurgie_modele:write']], normalizationContext: ['groups' => ['chirurgie_modele:read']], openapi: new OpenApiOperation(summary: 'Créer une chirurgie modèle', description: 'Ajoute une nouvelle intervention type au référentiel.')),
         new Patch(uriTemplate: '/chirurgie-modeles/{id}', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['chirurgie_modele:write']], normalizationContext: ['groups' => ['chirurgie_modele:read']], openapi: new OpenApiOperation(summary: 'Modifier une chirurgie modèle', description: 'Met à jour les informations d’une intervention type existante.')),
         new Delete(uriTemplate: '/chirurgie-modeles/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une chirurgie modèle', description: 'Supprime une intervention type si elle n’est pas utilisée par des données liées.')),
     ]
 )]
-#[ApiFilter(SearchFilter::class, properties: ['intitule' => 'partial'])]
 class ChirurgieModele
 {
     #[ORM\Id]

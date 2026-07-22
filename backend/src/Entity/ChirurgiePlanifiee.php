@@ -3,17 +3,16 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
-use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
-use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
-use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Doctrine\Orm\Filter\SortFilter;
 use App\Repository\ChirurgiePlanifieeRepository;
 use App\Dto\ChirurgiePreparation;
 use App\Dto\ChirurgieVueFinale;
@@ -35,20 +34,24 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'Chirurgie planifiée dans une salle et à une date donnée.',
     operations: [
-        new GetCollection(uriTemplate: '/chirurgies-planifiees', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_planifiee:list']], openapi: new OpenApiOperation(summary: 'Lister les chirurgies planifiées', description: 'Retourne les chirurgies programmées, avec filtres possibles par date, salle, chirurgien, modèle ou validation.')),
+        new GetCollection(uriTemplate: '/chirurgies-planifiees', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_planifiee:list']], parameters: [
+            'dateProgrammee' => new QueryParameter(property: 'dateProgrammee', filter: DateFilter::class),
+            'salle' => new QueryParameter(property: 'salle', filter: new ExactFilter()),
+            'chirurgien' => new QueryParameter(property: 'chirurgien', filter: new ExactFilter()),
+            'chirurgieModele' => new QueryParameter(property: 'chirurgieModele', filter: new ExactFilter()),
+            'valide' => new QueryParameter(property: 'valide', filter: new ExactFilter(), schema: ['type' => 'boolean'], castToNativeType: true),
+            'order[dateProgrammee]' => new QueryParameter(property: 'dateProgrammee', filter: new SortFilter()),
+            'order[ordre]' => new QueryParameter(property: 'ordre', filter: new SortFilter()),
+        ], openapi: new OpenApiOperation(summary: 'Lister les chirurgies planifiées', description: 'Retourne les chirurgies programmées, avec filtres possibles par date, salle, chirurgien, modèle ou validation.')),
         new Get(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_planifiee:read']], openapi: new OpenApiOperation(summary: 'Consulter une chirurgie planifiée', description: 'Retourne le détail d’une chirurgie planifiée à partir de son identifiant.')),
         new Get(uriTemplate: '/chirurgies-planifiees/{id}/preparation', security: "is_granted('ROLE_USER')", output: ChirurgiePreparation::class, provider: ChirurgiePreparationProvider::class, openapi: new OpenApiOperation(summary: 'Consulter la préparation matériel', description: 'Retourne la liste de préparation du matériel associée à une chirurgie planifiée.')),
         new Get(uriTemplate: '/chirurgies-planifiees/{id}/vue-finale', security: "is_granted('ROLE_USER')", output: ChirurgieVueFinale::class, provider: VueFinaleProvider::class, openapi: new OpenApiOperation(summary: 'Consulter la vue finale', description: 'Retourne la synthèse finale d’une chirurgie avec les consignes et l’état du matériel.')),
         new Post(uriTemplate: '/chirurgies-planifiees', security: "is_granted('ROLE_USER')", denormalizationContext: ['groups' => ['chirurgie_planifiee:write']], normalizationContext: ['groups' => ['chirurgie_planifiee:read']], processor: ChirurgiePlanifieeWriteProcessor::class, openapi: new OpenApiOperation(summary: 'Planifier une chirurgie', description: 'Crée une chirurgie planifiée et initialise sa préparation matériel.')),
-        new Post(uriTemplate: '/chirurgies-planifiees/{id}/validation', security: "is_granted('ROLE_USER')", read: false, input: false, output: ChirurgiePlanifiee::class, normalizationContext: ['groups' => ['chirurgie_planifiee:read']], processor: ChirurgieValidationProcessor::class, openapi: new OpenApiOperation(summary: 'Valider une chirurgie', description: 'Marque une chirurgie planifiée comme validée par l’utilisateur connecté.')),
+        new Post(uriTemplate: '/chirurgies-planifiees/{id}/validation', security: "is_granted('ROLE_USER')", input: false, output: ChirurgiePlanifiee::class, normalizationContext: ['groups' => ['chirurgie_planifiee:read']], processor: ChirurgieValidationProcessor::class, openapi: new OpenApiOperation(summary: 'Valider une chirurgie', description: 'Marque une chirurgie planifiée comme validée par l’utilisateur connecté.')),
         new Patch(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_USER')", denormalizationContext: ['groups' => ['chirurgie_planifiee:write']], normalizationContext: ['groups' => ['chirurgie_planifiee:read']], openapi: new OpenApiOperation(summary: 'Modifier une chirurgie planifiée', description: 'Met à jour la date, la salle, l’ordre ou les références d’une chirurgie planifiée.')),
         new Delete(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une chirurgie planifiée', description: 'Supprime une chirurgie planifiée si les règles métier l’autorisent.')),
     ]
 )]
-#[ApiFilter(DateFilter::class, properties: ['dateProgrammee'])]
-#[ApiFilter(SearchFilter::class, properties: ['salle' => 'exact', 'chirurgien' => 'exact', 'chirurgieModele' => 'exact'])]
-#[ApiFilter(BooleanFilter::class, properties: ['valide'])]
-#[ApiFilter(OrderFilter::class, properties: ['dateProgrammee', 'ordre'], arguments: ['orderParameterName' => 'order'])]
 class ChirurgiePlanifiee
 {
     #[ORM\Id]

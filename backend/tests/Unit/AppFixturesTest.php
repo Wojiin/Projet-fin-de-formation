@@ -33,7 +33,7 @@ final class AppFixturesTest extends TestCase
 
         $manager = $this->createMock(ObjectManager::class);
         $manager
-            ->expects(self::exactly(52))
+            ->expects(self::exactly(684))
             ->method('persist')
             ->willReturnCallback(function (object $entity): void {
                 $this->entities[] = $entity;
@@ -46,13 +46,13 @@ final class AppFixturesTest extends TestCase
     public function testFixturesCreentLeBonNombreDentites(): void
     {
         self::assertCount(2, $this->entitiesOfType(User::class));
-        self::assertCount(3, $this->entitiesOfType(Chirurgien::class));
-        self::assertCount(4, $this->entitiesOfType(ChirurgieModele::class));
-        self::assertCount(4, $this->entitiesOfType(FicheTechnique::class));
-        self::assertCount(8, $this->entitiesOfType(Materiel::class));
-        self::assertCount(4, $this->entitiesOfType(ListeMateriel::class));
-        self::assertCount(4, $this->entitiesOfType(ChirurgiePlanifiee::class));
-        self::assertCount(23, $this->entitiesOfType(PreparationMateriel::class));
+        self::assertCount(5, $this->entitiesOfType(Chirurgien::class));
+        self::assertCount(20, $this->entitiesOfType(ChirurgieModele::class));
+        self::assertCount(60, $this->entitiesOfType(FicheTechnique::class));
+        self::assertCount(100, $this->entitiesOfType(Materiel::class));
+        self::assertCount(100, $this->entitiesOfType(ListeMateriel::class));
+        self::assertCount(30, $this->entitiesOfType(ChirurgiePlanifiee::class));
+        self::assertCount(367, $this->entitiesOfType(PreparationMateriel::class));
     }
 
     public function testFixturesCreentLesComptesUtilisateurEtAdministrateur(): void
@@ -74,10 +74,10 @@ final class AppFixturesTest extends TestCase
     {
         $fiches = $this->entitiesOfType(FicheTechnique::class);
 
-        self::assertCount(4, $fiches);
+        self::assertCount(60, $fiches);
         foreach ($fiches as $fiche) {
             self::assertInstanceOf(ChirurgieModele::class, $fiche->getChirurgieModele());
-            self::assertSame(1, $fiche->getOrdre());
+            self::assertContains($fiche->getOrdre(), [1, 2, 3]);
             self::assertNotEmpty($fiche->getTitre());
             self::assertNotEmpty($fiche->getDescription());
         }
@@ -87,12 +87,10 @@ final class AppFixturesTest extends TestCase
     {
         $listes = $this->entitiesOfType(ListeMateriel::class);
 
-        self::assertSame([6, 6, 5, 6], array_map(
-            static fn (ListeMateriel $liste): int => $liste->getMateriels()->count(),
-            $listes,
-        ));
-
+        self::assertCount(100, $listes);
         foreach ($listes as $liste) {
+            self::assertGreaterThanOrEqual(10, $liste->getMateriels()->count());
+            self::assertLessThanOrEqual(15, $liste->getMateriels()->count());
             self::assertInstanceOf(Chirurgien::class, $liste->getChirurgien());
             self::assertInstanceOf(ChirurgieModele::class, $liste->getChirurgieModele());
             self::assertNotEmpty($liste->getIntitule());
@@ -102,20 +100,26 @@ final class AppFixturesTest extends TestCase
     public function testPlanningEtPreparationsRespectentLeScenarioInitial(): void
     {
         $chirurgies = $this->entitiesOfType(ChirurgiePlanifiee::class);
+        $listes = $this->entitiesOfType(ListeMateriel::class);
         $users = $this->entitiesOfType(User::class);
         $simpleUser = array_values(array_filter(
             $users,
             static fn (User $user): bool => 'user@chirorg.test' === $user->getEmail(),
         ))[0];
 
-        self::assertSame(['Salle A', 'Salle B', 'Salle C', 'Salle A'], array_map(
+        self::assertCount(30, $chirurgies);
+        self::assertSame(['Salle A', 'Salle A', 'Salle B', 'Salle B'], array_slice(array_map(
             static fn (ChirurgiePlanifiee $chirurgie): ?string => $chirurgie->getSalle(),
             $chirurgies,
-        ));
-        self::assertSame([6, 6, 5, 6], array_map(
+        ), 0, 4));
+        self::assertSame([10, 11, 12, 13, 14], array_slice(array_map(
+            static fn (ListeMateriel $liste): int => $liste->getMateriels()->count(),
+            $listes,
+        ), 0, 5));
+        self::assertSame([10, 11, 13, 14, 10], array_slice(array_map(
             static fn (ChirurgiePlanifiee $chirurgie): int => $chirurgie->getPreparationsMateriel()->count(),
             $chirurgies,
-        ));
+        ), 0, 5));
 
         self::assertTrue($chirurgies[0]->isValide());
         self::assertSame($simpleUser, $chirurgies[0]->getValidePar());
@@ -126,17 +130,19 @@ final class AppFixturesTest extends TestCase
                 && $simpleUser === $preparation->getCochePar(),
         ));
 
-        $deuxiemePreparation = $chirurgies[1]->getPreparationsMateriel();
-        self::assertSame(3, $deuxiemePreparation->filter(
+        self::assertTrue($chirurgies[1]->isValide());
+        self::assertTrue($chirurgies[2]->getPreparationsMateriel()->forAll(
+            static fn (int $index, PreparationMateriel $preparation): bool => $preparation->isCoche()
+                && null !== $preparation->getCocheLe()
+                && $simpleUser === $preparation->getCochePar(),
+        ));
+
+        $sixiemePreparation = $chirurgies[5]->getPreparationsMateriel();
+        self::assertSame($sixiemePreparation->count(), $sixiemePreparation->filter(
             static fn (PreparationMateriel $preparation): bool => $preparation->isCoche(),
         )->count());
-        self::assertFalse($chirurgies[1]->isValide());
-        self::assertTrue($chirurgies[2]->getPreparationsMateriel()->forAll(
-            static fn (int $index, PreparationMateriel $preparation): bool => !$preparation->isCoche(),
-        ));
-        self::assertTrue($chirurgies[3]->getPreparationsMateriel()->forAll(
-            static fn (int $index, PreparationMateriel $preparation): bool => !$preparation->isCoche(),
-        ));
+        self::assertTrue($chirurgies[5]->isValide());
+        self::assertFalse($chirurgies[6]->isValide());
     }
 
     /**

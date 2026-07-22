@@ -5,9 +5,9 @@ namespace App\Service;
 use App\Entity\ChirurgiePlanifiee;
 use App\Entity\ListeMateriel;
 use App\Entity\PreparationMateriel;
+use App\Exception\ApiProblemException;
 use App\Repository\ListeMaterielRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final readonly class PreparationMaterielInitializer
 {
@@ -23,11 +23,11 @@ final readonly class PreparationMaterielInitializer
         $modele = $chirurgie->getChirurgieModele();
 
         if (null === $chirurgien || null === $modele) {
-            throw new ConflictHttpException('Le chirurgien et la chirurgie modèle sont requis pour initialiser le matériel.');
+            throw new ApiProblemException('INVALID_CHIRURGIE', 'Le chirurgien et la chirurgie modèle sont requis pour initialiser le matériel.');
         }
 
         return $this->listeRepository->findOneForChirurgienAndChirurgieModele($chirurgien, $modele)
-            ?? throw new ConflictHttpException(
+            ?? throw new ApiProblemException('LISTE_MATERIEL_INTROUVABLE',
             'Aucune liste de matériel ne correspond à ce chirurgien et à cette chirurgie modèle.',
         );
     }
@@ -35,7 +35,7 @@ final readonly class PreparationMaterielInitializer
     public function initializeForChirurgie(ChirurgiePlanifiee $chirurgie): void
     {
         if ($chirurgie->isValide()) {
-            throw new ConflictHttpException('Le matériel d’une chirurgie validée ne peut plus être initialisé.');
+            throw new ApiProblemException('PREPARATION_VERROUILLEE', 'Le matériel d’une chirurgie validée ne peut plus être initialisé.');
         }
 
         $liste = $this->findListe($chirurgie);

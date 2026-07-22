@@ -4,3 +4,4 @@
 backend/vendor/
 backend/var/
 backend/.phpunit.cache/
+frontend/

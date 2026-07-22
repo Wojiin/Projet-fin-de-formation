@@ -14,7 +14,7 @@ Envoie automatiquement le cookie HttpOnly. Retour : un nouveau JWT et un nouveau
 
 ### `POST /logout` — public
 
-Révoque le refresh token fourni par cookie et expire ce cookie. Retour : `{"message":"Déconnexion réussie."}`.
+Le listener de déconnexion de JWTRefreshTokenBundle révoque le refresh token fourni par cookie et expire ce cookie. La réponse confirme que le token a été invalidé (ou l’était déjà).
 
 ### `GET /me` — `ROLE_USER`
 
@@ -24,15 +24,21 @@ Retour : `{"id":1,"email":"user@chirorg.test","roles":["ROLE_USER"]}`. Le mot de
 
 ### `GET /programmes-operatoires` — `ROLE_USER`
 
-Paramètres : `date=YYYY-MM-DD`, ou `dateDebut` / `dateFin`, et `salle`. `date` est prioritaire ; sans date, le jour courant est utilisé.
+Paramètres déclarés et validés par API Platform : `date=YYYY-MM-DD`, ou `dateDebut` / `dateFin`, ainsi que `salle` et `chirurgien` (entier positif). `date` est prioritaire ; sans date, le jour courant est utilisé. Un paramètre inconnu retourne `400`.
 
-Retour : liste plate triée par date, salle, ordre et identifiant :
+Retour : liste regroupée par jour, salle et chirurgien, destinée à la page d’accueil :
 
 ```json
-[{"id":1,"date":"2026-07-20","heure":"08:00","dateProgrammee":"2026-07-20T08:00:00+00:00","salle":"Salle A","ordre":1,"valide":false,"chirurgien":{"id":1,"prenom":"Jean","nom":"Dupont"},"chirurgieModele":{"id":1,"intitule":"Prothèse de genou"},"progressionPreparation":{"total":6,"coches":3,"complete":false}}]
+[{"date":"2026-07-20","salle":"Salle A","chirurgien":{"id":1,"prenom":"Jean","nom":"Dupont"},"nombreChirurgies":2,"nombreChirurgiesValidees":1,"progressionPreparation":{"total":12,"coches":9,"complete":false}}]
 ```
 
-`GET /programmes-operatoires/{date}` applique directement la date du chemin. Erreurs : `400` date invalide.
+### `GET /programmes-operatoires/{date}/{salle}/{chirurgien}` — `ROLE_USER`
+
+Retourne le détail d’un programme avec les chirurgies planifiées et leurs lignes de préparation. Le front coche une ligne via `PATCH /preparations-materiel/{id}/cocher`, puis valide la chirurgie via `POST /chirurgies-planifiees/{id}/validation`.
+
+### `GET /programmes-operatoires/{date}/{salle}/{chirurgien}/vue-finale` — `ROLE_USER`
+
+Retourne uniquement les chirurgies validées du programme, en lecture seule, avec les fiches techniques de leur chirurgie modèle. Erreurs : `400` date ou chirurgien invalide, `404` programme absent.
 
 ## Préparation et validation
 
@@ -42,7 +48,7 @@ Retourne la chirurgie, le chirurgien, le modèle, la checklist et sa progression
 
 ### `PATCH /preparations-materiel/{id}/cocher` — `ROLE_USER`
 
-Body : `{"coche":true}`. Met à jour `cocheLe` et `cochePar`; un décochage remet ces valeurs à `null`. Erreurs : `400` body invalide, `404`, `409` chirurgie déjà validée.
+Body : `{"coche":true}`. Le DTO d’entrée est désérialisé et validé par API Platform. La route met à jour `cocheLe` et `cochePar`; un décochage remet ces valeurs à `null`. Erreurs : `400` JSON invalide, `422` donnée invalide, `404`, `409` chirurgie déjà validée.
 
 ### `POST /chirurgies-planifiees/{id}/validation` — `ROLE_USER`
 
@@ -57,7 +63,13 @@ Retourne la chirurgie validée, l’utilisateur validateur, le matériel présen
 Les routes `/users`, `/chirurgiens`, `/chirurgie-modeles`, `/fiches-techniques`, `/materiels` et `/listes-materiel` sont modifiables par `ROLE_ADMIN`. Les lectures des référentiels sont accessibles à `ROLE_USER`. Une suppression d’une ressource utilisée retourne `409` :
 
 ```json
-{"code":"RESOURCE_ALREADY_USED","message":"Cette ressource ne peut pas être supprimée car elle est déjà utilisée."}
+{
+  "type": "/api/errors/resource-already-used",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Cette ressource ne peut pas être supprimée car elle est déjà utilisée.",
+  "errorCode": "RESOURCE_ALREADY_USED"
+}
 ```
 
-Les erreurs métier utilisent toujours la forme `{"code":"...","message":"..."}`. Les validations API Platform retournent `422`.
+Les erreurs métier sont des ressources d’erreur API Platform au format RFC 7807. Les validations API Platform retournent `422` avec la liste des violations.

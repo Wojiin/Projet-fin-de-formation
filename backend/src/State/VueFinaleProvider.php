@@ -5,9 +5,9 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
 use App\Dto\ChirurgieVueFinale;
+use App\Exception\ApiProblemException;
 use App\Repository\ChirurgiePlanifieeRepository;
 use DateTimeInterface;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final readonly class VueFinaleProvider implements ProviderInterface
@@ -22,7 +22,7 @@ final readonly class VueFinaleProvider implements ProviderInterface
             ?? throw new NotFoundHttpException('Chirurgie planifiée introuvable.');
 
         if (!$chirurgie->isValide()) {
-            throw new ConflictHttpException('La vue finale est disponible uniquement après validation.');
+            throw new ApiProblemException('CHIRURGIE_NON_VALIDEE', 'La vue finale est disponible uniquement après validation.');
         }
 
         $materiels = [];

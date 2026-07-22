@@ -3,17 +3,16 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
-use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use App\Repository\ListeMaterielRepository;
-use App\State\ListeMaterielParChirurgienProvider;
-use App\State\ListeMaterielParModeleProvider;
 use App\State\ReferenceDeleteProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -26,16 +25,18 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'Liste de matériel personnalisée pour un couple chirurgien / chirurgie modèle.',
     operations: [
-        new GetCollection(uriTemplate: '/listes-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:list']], openapi: new OpenApiOperation(summary: 'Lister les listes de matériel', description: 'Retourne les listes de matériel personnalisées par chirurgien et chirurgie modèle.')),
-        new GetCollection(uriTemplate: '/chirurgiens/{id}/listes-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:read']], provider: ListeMaterielParChirurgienProvider::class, openapi: new OpenApiOperation(summary: 'Lister les listes d’un chirurgien', description: 'Retourne les listes de matériel associées à un chirurgien donné.')),
-        new GetCollection(uriTemplate: '/chirurgie-modeles/{id}/listes-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:read']], provider: ListeMaterielParModeleProvider::class, openapi: new OpenApiOperation(summary: 'Lister les listes d’une chirurgie modèle', description: 'Retourne les listes de matériel associées à une intervention type.')),
+        new GetCollection(uriTemplate: '/listes-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:list']], parameters: [
+            'chirurgien' => new QueryParameter(property: 'chirurgien', filter: new ExactFilter()),
+            'chirurgieModele' => new QueryParameter(property: 'chirurgieModele', filter: new ExactFilter()),
+        ], openapi: new OpenApiOperation(summary: 'Lister les listes de matériel', description: 'Retourne les listes de matériel personnalisées par chirurgien et chirurgie modèle.')),
+        new GetCollection(uriTemplate: '/chirurgiens/{id}/listes-materiel', uriVariables: ['id' => new Link(fromClass: Chirurgien::class, toProperty: 'chirurgien')], security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:read']], order: ['intitule' => 'ASC'], openapi: new OpenApiOperation(summary: 'Lister les listes d’un chirurgien', description: 'Retourne les listes de matériel associées à un chirurgien donné.')),
+        new GetCollection(uriTemplate: '/chirurgie-modeles/{id}/listes-materiel', uriVariables: ['id' => new Link(fromClass: ChirurgieModele::class, toProperty: 'chirurgieModele')], security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:read']], order: ['intitule' => 'ASC'], openapi: new OpenApiOperation(summary: 'Lister les listes d’une chirurgie modèle', description: 'Retourne les listes de matériel associées à une intervention type.')),
         new Get(uriTemplate: '/listes-materiel/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:read']], openapi: new OpenApiOperation(summary: 'Consulter une liste de matériel', description: 'Retourne le détail d’une liste de matériel et ses éléments.')),
         new Post(uriTemplate: '/listes-materiel', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['liste_materiel:write']], normalizationContext: ['groups' => ['liste_materiel:read']], openapi: new OpenApiOperation(summary: 'Créer une liste de matériel', description: 'Crée une liste personnalisée pour un couple chirurgien et chirurgie modèle.')),
         new Patch(uriTemplate: '/listes-materiel/{id}', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['liste_materiel:write']], normalizationContext: ['groups' => ['liste_materiel:read']], openapi: new OpenApiOperation(summary: 'Modifier une liste de matériel', description: 'Met à jour l’intitulé ou le contenu d’une liste de matériel.')),
         new Delete(uriTemplate: '/listes-materiel/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une liste de matériel', description: 'Supprime une liste de matériel si elle n’est pas référencée par une préparation.')),
     ]
 )]
-#[ApiFilter(SearchFilter::class, properties: ['chirurgien' => 'exact', 'chirurgieModele' => 'exact'])]
 class ListeMateriel
 {
     #[ORM\Id]

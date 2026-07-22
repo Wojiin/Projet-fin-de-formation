@@ -25,6 +25,9 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
         ?DateTimeInterface $dateDebut = null,
         ?DateTimeInterface $dateFin = null,
         ?string $salle = null,
+        ?int $chirurgienId = null,
+        ?bool $valide = null,
+        bool $withFichesTechniques = false,
     ): array {
         $qb = $this->baseDataQuery();
 
@@ -49,9 +52,23 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
             $qb->andWhere('chirurgie.salle = :salle')->setParameter('salle', trim($salle));
         }
 
+        if (null !== $chirurgienId) {
+            $qb->andWhere('chirurgien.id = :chirurgienId')->setParameter('chirurgienId', $chirurgienId);
+        }
+
+        if (null !== $valide) {
+            $qb->andWhere('chirurgie.valide = :valide')->setParameter('valide', $valide);
+        }
+
+        if ($withFichesTechniques) {
+            $qb->leftJoin('modele.fichesTechniques', 'fiche')->addSelect('fiche');
+        }
+
         return $qb
             ->orderBy('chirurgie.dateProgrammee', 'ASC')
             ->addOrderBy('chirurgie.salle', 'ASC')
+            ->addOrderBy('chirurgien.nom', 'ASC')
+            ->addOrderBy('chirurgien.prenom', 'ASC')
             ->addOrderBy('chirurgie.ordre', 'ASC')
             ->addOrderBy('chirurgie.id', 'ASC')
             ->getQuery()

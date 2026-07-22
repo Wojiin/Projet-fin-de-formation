@@ -10,9 +10,9 @@ use App\Entity\ChirurgiePlanifiee;
 use App\Entity\ListeMateriel;
 use App\Entity\Materiel;
 use App\Entity\User;
+use App\Exception\ApiProblemException;
 use App\Repository\ChirurgiePlanifieeRepository;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final readonly class ReferenceDeleteProcessor implements ProcessorInterface
 {
@@ -39,7 +39,7 @@ final readonly class ReferenceDeleteProcessor implements ProcessorInterface
         };
 
         if ($used) {
-            throw new ConflictHttpException('Cette ressource ne peut pas être supprimée car elle est déjà utilisée.');
+            throw new ApiProblemException('RESOURCE_ALREADY_USED', 'Cette ressource ne peut pas être supprimée car elle est déjà utilisée.');
         }
 
         return $this->removeProcessor->process($data, $operation, $uriVariables, $context);

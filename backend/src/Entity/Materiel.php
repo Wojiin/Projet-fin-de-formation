@@ -3,14 +3,15 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
+use ApiPlatform\Doctrine\Orm\Filter\PartialSearchFilter;
+use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
-use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use App\Repository\MaterielRepository;
 use App\State\ReferenceDeleteProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -24,14 +25,17 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'Référentiel du matériel utilisé pour préparer les chirurgies.',
     operations: [
-        new GetCollection(uriTemplate: '/materiels', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['materiel:list']], openapi: new OpenApiOperation(summary: 'Lister le matériel', description: 'Retourne le référentiel du matériel utilisé pour les préparations opératoires.')),
+        new GetCollection(uriTemplate: '/materiels', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['materiel:list']], parameters: [
+            'intitule' => new QueryParameter(property: 'intitule', filter: new PartialSearchFilter()),
+            'typeMateriel' => new QueryParameter(property: 'typeMateriel', filter: new ExactFilter()),
+            'adresse' => new QueryParameter(property: 'adresse', filter: new PartialSearchFilter()),
+        ], openapi: new OpenApiOperation(summary: 'Lister le matériel', description: 'Retourne le référentiel du matériel utilisé pour les préparations opératoires.')),
         new Get(uriTemplate: '/materiels/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['materiel:read']], openapi: new OpenApiOperation(summary: 'Consulter un matériel', description: 'Retourne le détail d’un matériel à partir de son identifiant.')),
         new Post(uriTemplate: '/materiels', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['materiel:write']], normalizationContext: ['groups' => ['materiel:read']], openapi: new OpenApiOperation(summary: 'Créer un matériel', description: 'Ajoute un matériel au référentiel.')),
         new Patch(uriTemplate: '/materiels/{id}', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['materiel:write']], normalizationContext: ['groups' => ['materiel:read']], openapi: new OpenApiOperation(summary: 'Modifier un matériel', description: 'Met à jour l’intitulé, le type ou l’adresse d’un matériel.')),
         new Delete(uriTemplate: '/materiels/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer un matériel', description: 'Supprime un matériel si aucune liste ou préparation ne le référence.')),
     ]
 )]
-#[ApiFilter(SearchFilter::class, properties: ['intitule' => 'partial', 'typeMateriel' => 'exact', 'adresse' => 'partial'])]
 class Materiel
 {
     #[ORM\Id]

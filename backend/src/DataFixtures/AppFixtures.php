@@ -28,73 +28,78 @@ final class AppFixtures extends Fixture
         $manager->persist($user);
 
         $chirurgiens = [
-            $this->createChirurgien('Jean', 'Dupont', 'Orthopédie'),
-            $this->createChirurgien('Claire', 'Martin', 'Chirurgie viscérale'),
-            $this->createChirurgien('Alain', 'Bernard', 'Chirurgie générale'),
+            $this->createChirurgien('Jean', 'Dupont', 'Orthopedie'),
+            $this->createChirurgien('Claire', 'Martin', 'Chirurgie viscerale'),
+            $this->createChirurgien('Alain', 'Bernard', 'Chirurgie generale'),
+            $this->createChirurgien('Nadia', 'Petit', 'Traumatologie'),
+            $this->createChirurgien('Hugo', 'Leroy', 'Chirurgie ambulatoire'),
         ];
         foreach ($chirurgiens as $chirurgien) {
             $manager->persist($chirurgien);
         }
 
         $modeles = [];
-        foreach (['Prothèse de genou', 'Appendicectomie', 'Arthroscopie épaule', 'Coelioscopie'] as $index => $intitule) {
+        foreach ($this->getChirurgieModeleNames() as $intitule) {
             $modele = (new ChirurgieModele())->setIntitule($intitule);
-            $fiche = (new FicheTechnique())
-                ->setTitre('Préparation - '.$intitule)
-                ->setDescription('Installer le patient, vérifier la salle et respecter les points de vigilance de l’intervention.')
-                ->setOrdre(1)
-                ->setChirurgieModele($modele);
             $modeles[] = $modele;
             $manager->persist($modele);
-            $manager->persist($fiche);
+
+            foreach ($this->createFichesTechniques($modele, $intitule) as $fiche) {
+                $manager->persist($fiche);
+            }
         }
 
         $materiels = [];
-        foreach ([
-            ['Scalpel n°10', 'Armoire A1', 'Instrument'],
-            ['Compresses stériles', 'Réserve B2', 'Consommable'],
-            ['Gants stériles', 'Réserve B1', 'Consommable'],
-            ['Boîte orthopédie', 'Armoire C3', 'Boîte opératoire'],
-            ['Champ opératoire', 'Réserve B3', 'Consommable'],
-            ['Pinces', 'Armoire A2', 'Instrument'],
-            ['Aspiration', 'Salle technique', 'Équipement'],
-            ['Plateau anesthésie', 'Zone anesthésie', 'Plateau'],
-        ] as [$intitule, $adresse, $type]) {
+        foreach ($this->createMaterielsData() as [$intitule, $adresse, $type]) {
             $materiel = (new Materiel())->setIntitule($intitule)->setAdresse($adresse)->setTypeMateriel($type);
             $materiels[] = $materiel;
             $manager->persist($materiel);
         }
 
-        $couples = [
-            [$chirurgiens[0], $modeles[0], 'Liste genou Dupont', [0, 1, 2, 3, 4, 5]],
-            [$chirurgiens[1], $modeles[1], 'Liste appendicectomie Martin', [0, 1, 2, 4, 5, 6]],
-            [$chirurgiens[2], $modeles[2], 'Liste arthroscopie Bernard', [0, 1, 2, 3, 6]],
-            [$chirurgiens[1], $modeles[3], 'Liste coelioscopie Martin', [0, 1, 2, 4, 6, 7]],
-        ];
-
         $listes = [];
-        foreach ($couples as [$chirurgien, $modele, $intitule, $indices]) {
-            $liste = (new ListeMateriel())->setIntitule($intitule)->setChirurgien($chirurgien)->setChirurgieModele($modele);
-            foreach ($indices as $indice) {
-                $liste->addMateriel($materiels[$indice]);
+        foreach ($chirurgiens as $chirurgienIndex => $chirurgien) {
+            foreach ($modeles as $modeleIndex => $modele) {
+                $liste = (new ListeMateriel())
+                    ->setIntitule(sprintf('Liste %s %s - %s', $chirurgien->getNom(), $chirurgien->getPrenom(), $modele->getIntitule()))
+                    ->setChirurgien($chirurgien)
+                    ->setChirurgieModele($modele);
+
+                foreach ($this->pickMaterielsForList($materiels, $chirurgienIndex, $modeleIndex) as $materiel) {
+                    $liste->addMateriel($materiel);
+                }
+
+                $listes[$chirurgienIndex.'-'.$modeleIndex] = $liste;
+                $manager->persist($liste);
             }
-            $listes[] = $liste;
-            $manager->persist($liste);
         }
 
         $aujourdhui = new \DateTimeImmutable('today');
-        $chirurgies = [
-            $this->createChirurgie($aujourdhui->setTime(8, 0), 'Salle A', 1, $chirurgiens[0], $modeles[0]),
-            $this->createChirurgie($aujourdhui->setTime(10, 30), 'Salle B', 1, $chirurgiens[1], $modeles[1]),
-            $this->createChirurgie($aujourdhui->modify('+1 day')->setTime(9, 0), 'Salle C', 1, $chirurgiens[2], $modeles[2]),
-            $this->createChirurgie($aujourdhui->modify('+1 day')->setTime(13, 30), 'Salle A', 2, $chirurgiens[1], $modeles[3]),
-        ];
+        $salles = ['Salle A', 'Salle B', 'Salle C'];
+        $chirurgies = [];
 
-        foreach ($chirurgies as $chirurgieIndex => $chirurgie) {
+        for ($chirurgieIndex = 0; $chirurgieIndex < 30; ++$chirurgieIndex) {
+            $groupeIndex = intdiv($chirurgieIndex, 2);
+            $chirurgienIndex = $groupeIndex % count($chirurgiens);
+            $modeleIndex = $chirurgieIndex % count($modeles);
+            $date = $aujourdhui
+                ->modify(sprintf('+%d day', intdiv($chirurgieIndex, 6)))
+                ->setTime(8 + (($chirurgieIndex % 2) * 2), 0);
+
+            $chirurgie = $this->createChirurgie(
+                $date,
+                $salles[$groupeIndex % count($salles)],
+                ($chirurgieIndex % 2) + 1,
+                $chirurgiens[$chirurgienIndex],
+                $modeles[$modeleIndex],
+            );
+
+            $chirurgies[] = $chirurgie;
             $manager->persist($chirurgie);
-            foreach ($listes[$chirurgieIndex]->getMateriels() as $materielIndex => $materiel) {
+
+            $liste = $listes[$chirurgienIndex.'-'.$modeleIndex];
+            foreach ($liste->getMateriels() as $materielIndex => $materiel) {
                 $preparation = (new PreparationMateriel())->setChirurgiePlanifiee($chirurgie)->setMateriel($materiel);
-                if (0 === $chirurgieIndex || (1 === $chirurgieIndex && $materielIndex < 3)) {
+                if (0 === $chirurgieIndex || (0 === $chirurgieIndex % 5 && $materielIndex < 4)) {
                     $preparation->setCoche(true)->setCocheLe(new \DateTimeImmutable())->setCochePar($user);
                 }
                 $chirurgie->addPreparationMateriel($preparation);
@@ -102,7 +107,13 @@ final class AppFixtures extends Fixture
             }
         }
 
-        $chirurgies[0]->setValide(true)->setValideLe(new \DateTimeImmutable())->setValidePar($user);
+        foreach (array_slice($chirurgies, 0, 6) as $chirurgie) {
+            foreach ($chirurgie->getPreparationsMateriel() as $preparation) {
+                $preparation->setCoche(true)->setCocheLe(new \DateTimeImmutable())->setCochePar($user);
+            }
+            $chirurgie->setValide(true)->setValideLe(new \DateTimeImmutable())->setValidePar($user);
+        }
+
         $manager->flush();
     }
 
@@ -125,5 +136,122 @@ final class AppFixtures extends Fixture
             ->setOrdre($ordre)
             ->setChirurgien($chirurgien)
             ->setChirurgieModele($modele);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function getChirurgieModeleNames(): array
+    {
+        return [
+            'Prothese totale de genou',
+            'Prothese totale de hanche',
+            'Appendicectomie',
+            'Cholecystectomie coelioscopique',
+            'Arthroscopie epaule',
+            'Arthroscopie genou',
+            'Canal carpien',
+            'Hernie inguinale',
+            'Coelioscopie exploratrice',
+            'Ligamentoplastie croise anterieur',
+            'Osteosynthese cheville',
+            'Osteosynthese poignet',
+            'Ablation materiel orthopedique',
+            'Cure eventration',
+            'Thyroidectomie partielle',
+            'Biopsie ganglionnaire',
+            'Suture tendon achille',
+            'Reparation coiffe rotateurs',
+            'Hemicolectomie droite',
+            'Pose chambre implantable',
+        ];
+    }
+
+    /**
+     * @return list<FicheTechnique>
+     */
+    private function createFichesTechniques(ChirurgieModele $modele, string $intitule): array
+    {
+        $etapes = [
+            ['Installation', 'Installer le patient selon le protocole et verifier les points d appui.'],
+            ['Preparation de salle', 'Controler l aspiration, l eclairage, l imagerie et la disponibilite du plateau.'],
+            ['Temps operatoire', 'Confirmer les instruments critiques et les consommables specifiques a l intervention.'],
+        ];
+
+        $fiches = [];
+        foreach ($etapes as $index => [$titre, $description]) {
+            $fiches[] = (new FicheTechnique())
+                ->setTitre($titre.' - '.$intitule)
+                ->setDescription($description)
+                ->setOrdre($index + 1)
+                ->setChirurgieModele($modele);
+        }
+
+        return $fiches;
+    }
+
+    /**
+     * @return list<array{string, string, string}>
+     */
+    private function createMaterielsData(): array
+    {
+        $noms = [
+            'Scalpel n10', 'Scalpel n15', 'Manche bistouri n3', 'Manche bistouri n4',
+            'Ciseaux Mayo droits', 'Ciseaux Mayo courbes', 'Ciseaux Metzenbaum', 'Pince Kocher droite',
+            'Pince Kocher courbe', 'Pince Kelly', 'Pince Halsted', 'Pince Adson',
+            'Pince a dissequer', 'Pince anatomique', 'Pince chirurgicale', 'Pince porte aiguille',
+            'Ecarteur Farabeuf', 'Ecarteur Gelpi', 'Ecarteur Weitlaner', 'Ecarteur abdominal',
+            'Valve de Doyen', 'Valve de Richardson', 'Aiguille courbe', 'Aiguille droite',
+            'Fil resorbable 2-0', 'Fil resorbable 3-0', 'Fil non resorbable 2-0', 'Fil non resorbable 3-0',
+            'Agrafeuse cutanee', 'Ote agrafes', 'Compresses steriles 10x10', 'Compresses steriles 5x5',
+            'Champs operatoires', 'Casaque sterile', 'Gants steriles taille 6', 'Gants steriles taille 7',
+            'Gants steriles taille 8', 'Seringue 10 ml', 'Seringue 20 ml', 'Aiguille injection',
+            'Canule aspiration', 'Tuyau aspiration', 'Bocal aspiration', 'Electrode bistouri',
+            'Plaque bistouri electrique', 'Cable bistouri electrique', 'Poignee lumiere sterile', 'Sonde urinaire',
+            'Poche recueil', 'Drain Redon', 'Drain aspiratif', 'Lame de drainage',
+            'Set perfusion', 'Tubulure perfusion', 'Pansement sterile', 'Pansement compressif',
+            'Bande adhesive', 'Bande elastique', 'Garrot pneumatique', 'Moteur orthopedique',
+            'Scie oscillante', 'Foret 2 mm', 'Foret 3 mm', 'Foret 4 mm',
+            'Broche Kirschner', 'Plaque verrouillee', 'Vis corticale', 'Vis spongieuse',
+            'Guide de coupe', 'Ancillaire genou', 'Ancillaire hanche', 'Cotyle essai',
+            'Tige femorale essai', 'Rape femorale', 'Curette osseuse', 'Maillet orthopedique',
+            'Osteotome', 'Rugine', 'Pince a os', 'Camera arthroscopie',
+            'Optique 30 degres', 'Trocart arthroscopie', 'Shaver', 'Pompe arthroscopie',
+            'Canule arthroscopie', 'Fil guide', 'Trocart coelioscopie', 'Optique coelioscopie',
+            'Insufflateur', 'Clip applier', 'Pinces coelioscopie', 'Sac extraction',
+            'Ligasure', 'Hemolock', 'Plateau anesthesie', 'Masque oxygene',
+            'Capteur saturation', 'Couverture chauffante', 'Solution antiseptique', 'Brosse chirurgicale',
+        ];
+        $types = ['Instrument', 'Consommable', 'Equipement', 'Boite operatoire', 'Implant', 'Plateau'];
+        $adresses = ['Armoire A', 'Armoire B', 'Armoire C', 'Reserve sterile', 'Salle technique', 'Zone anesthesie'];
+
+        $materiels = [];
+        foreach ($noms as $index => $nom) {
+            $materiels[] = [
+                $nom,
+                sprintf('%s%d', $adresses[$index % count($adresses)], intdiv($index, count($adresses)) + 1),
+                $types[$index % count($types)],
+            ];
+        }
+
+        return $materiels;
+    }
+
+    /**
+     * @param list<Materiel> $materiels
+     *
+     * @return list<Materiel>
+     */
+    private function pickMaterielsForList(array $materiels, int $chirurgienIndex, int $modeleIndex): array
+    {
+        $selection = [];
+        $start = (($modeleIndex * 5) + ($chirurgienIndex * 3)) % count($materiels);
+        $count = 10 + (($modeleIndex + $chirurgienIndex) % 6);
+
+        for ($offset = 0; $offset < $count; ++$offset) {
+            $selection[] = $materiels[($start + ($offset * 7)) % count($materiels)];
+        }
+
+        return $selection;
     }
 }

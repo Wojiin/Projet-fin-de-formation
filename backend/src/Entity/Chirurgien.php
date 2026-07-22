@@ -9,8 +9,8 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
-use ApiPlatform\Metadata\ApiFilter;
-use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Doctrine\Orm\Filter\PartialSearchFilter;
+use ApiPlatform\Metadata\QueryParameter;
 use App\Repository\ChirurgienRepository;
 use App\State\ReferenceDeleteProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -24,14 +24,17 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'Référentiel des chirurgiens utilisés pour la planification des interventions.',
     operations: [
-        new GetCollection(uriTemplate: '/chirurgiens', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgien:list']], openapi: new OpenApiOperation(summary: 'Lister les chirurgiens', description: 'Retourne les chirurgiens enregistrés dans le référentiel.')),
+        new GetCollection(uriTemplate: '/chirurgiens', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgien:list']], parameters: [
+            'nom' => new QueryParameter(property: 'nom', filter: new PartialSearchFilter()),
+            'prenom' => new QueryParameter(property: 'prenom', filter: new PartialSearchFilter()),
+            'specialite' => new QueryParameter(property: 'specialite', filter: new PartialSearchFilter()),
+        ], openapi: new OpenApiOperation(summary: 'Lister les chirurgiens', description: 'Retourne les chirurgiens enregistrés dans le référentiel.')),
         new Get(uriTemplate: '/chirurgiens/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgien:read']], openapi: new OpenApiOperation(summary: 'Consulter un chirurgien', description: 'Retourne le détail d’un chirurgien à partir de son identifiant.')),
         new Post(uriTemplate: '/chirurgiens', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['chirurgien:write']], normalizationContext: ['groups' => ['chirurgien:read']], openapi: new OpenApiOperation(summary: 'Créer un chirurgien', description: 'Ajoute un chirurgien au référentiel de planification.')),
         new Patch(uriTemplate: '/chirurgiens/{id}', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['chirurgien:write']], normalizationContext: ['groups' => ['chirurgien:read']], openapi: new OpenApiOperation(summary: 'Modifier un chirurgien', description: 'Met à jour les informations d’un chirurgien existant.')),
         new Delete(uriTemplate: '/chirurgiens/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer un chirurgien', description: 'Supprime un chirurgien si aucune donnée liée ne bloque la suppression.')),
     ]
 )]
-#[ApiFilter(SearchFilter::class, properties: ['nom' => 'partial', 'prenom' => 'partial', 'specialite' => 'partial'])]
 class Chirurgien
 {
     #[ORM\Id]

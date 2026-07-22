@@ -4,13 +4,31 @@ namespace App\Tests\Functional;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
+use App\DataFixtures\AppFixtures;
 use App\Entity\ChirurgiePlanifiee;
 use App\Repository\ChirurgiePlanifieeRepository;
+use Doctrine\Common\DataFixtures\Purger\ORMPurger;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class ApiWorkflowTest extends ApiTestCase
 {
     protected static ?bool $alwaysBootKernel = true;
+
+    public static function setUpBeforeClass(): void
+    {
+        $kernel = static::bootKernel();
+        if ('test' !== $kernel->getEnvironment()) {
+            throw new \LogicException('Les fixtures de test ne doivent être chargées que dans l’environnement test.');
+        }
+
+        $container = static::getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        (new ORMPurger($entityManager))->purge();
+        $container->get(AppFixtures::class)->load($entityManager);
+        $entityManager->clear();
+
+        static::ensureKernelShutdown();
+    }
 
     public function testAuthenticationAndProtectedRoutes(): void
     {
@@ -20,6 +38,10 @@ final class ApiWorkflowTest extends ApiTestCase
         self::assertArrayHasKey('token', $client->getResponse()->toArray());
         $cookies = $client->getResponse()->getHeaders(false)['set-cookie'] ?? [];
         self::assertStringContainsString('refresh_token=', implode('; ', $cookies));
+
+        $client->request('POST', '/api/logout');
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('refresh_token=deleted', implode('; ', $client->getResponse()->getHeaders(false)['set-cookie'] ?? []));
 
         $client->request('POST', '/api/login', ['json' => ['email' => 'user@chirorg.test', 'password' => 'incorrect']]);
         self::assertResponseStatusCodeSame(401);
@@ -46,7 +68,7 @@ final class ApiWorkflowTest extends ApiTestCase
         self::assertResponseIsSuccessful();
     }
 
-    public function testProgrammeIsFlatAndCanBeFiltered(): void
+    public function testProgrammesSontRegroupesEtLeDetailSuitLeWorkflow(): void
     {
         $client = static::createClient();
         $token = $this->login($client, 'user@chirorg.test');
@@ -58,7 +80,8 @@ final class ApiWorkflowTest extends ApiTestCase
         self::assertIsList($programme);
         self::assertNotEmpty($programme);
         self::assertArrayHasKey('progressionPreparation', $programme[0]);
-        self::assertArrayNotHasKey('salles', $programme[0]);
+        self::assertArrayHasKey('nombreChirurgies', $programme[0]);
+        self::assertGreaterThanOrEqual(2, $programme[0]['nombreChirurgies']);
 
         $date = $programme[0]['date'];
         $client->request('GET', '/api/programmes-operatoires?date='.$date, ['headers' => $headers]);
@@ -73,7 +96,47 @@ final class ApiWorkflowTest extends ApiTestCase
             self::assertSame('Salle A', $item['salle']);
         }
 
+        $resume = $programme[0];
+        $detailUrl = sprintf(
+            '/api/programmes-operatoires/%s/%s/%d',
+            $resume['date'],
+            rawurlencode($resume['salle']),
+            $resume['chirurgien']['id'],
+        );
+        $client->request('GET', $detailUrl, ['headers' => $headers]);
+        self::assertResponseIsSuccessful();
+        $detail = $client->getResponse()->toArray();
+        self::assertSame($resume['date'], $detail['date']);
+        self::assertSame($resume['salle'], $detail['salle']);
+        self::assertCount($resume['nombreChirurgies'], $detail['chirurgies']);
+        self::assertNotEmpty($detail['chirurgies'][0]['preparationsMateriel']);
+
+        $programmesValides = array_values(array_filter(
+            $programme,
+            static fn (array $item): bool => 0 < $item['nombreChirurgiesValidees'],
+        ));
+        self::assertNotEmpty($programmesValides, 'Les fixtures doivent contenir au moins un programme validé.');
+        $programmeValide = $programmesValides[0];
+        $vueFinaleUrl = sprintf(
+            '/api/programmes-operatoires/%s/%s/%d/vue-finale',
+            $programmeValide['date'],
+            rawurlencode($programmeValide['salle']),
+            $programmeValide['chirurgien']['id'],
+        );
+
+        $client->request('GET', $vueFinaleUrl, ['headers' => $headers]);
+        self::assertResponseIsSuccessful();
+        $vueFinale = $client->getResponse()->toArray();
+        self::assertNotEmpty($vueFinale['chirurgies']);
+        foreach ($vueFinale['chirurgies'] as $chirurgie) {
+            self::assertTrue($chirurgie['valide']);
+            self::assertNotEmpty($chirurgie['fichesTechniques']);
+        }
+
         $client->request('GET', '/api/programmes-operatoires?date=20-07-2026', ['headers' => $headers]);
+        self::assertResponseStatusCodeSame(422);
+
+        $client->request('GET', '/api/programmes-operatoires?inconnu=valeur', ['headers' => $headers]);
         self::assertResponseStatusCodeSame(400);
     }
 
@@ -82,7 +145,7 @@ final class ApiWorkflowTest extends ApiTestCase
         $client = static::createClient();
         $token = $this->login($client, 'user@chirorg.test');
         $headers = $this->headers($token);
-        $chirurgie = $this->chirurgieRepository()->findOneBy(['salle' => 'Salle C']);
+        $chirurgie = $this->chirurgieRepository()->findOneBy(['salle' => 'Salle C', 'valide' => false]);
         self::assertInstanceOf(ChirurgiePlanifiee::class, $chirurgie);
         $this->resetPreparation($chirurgie);
 
@@ -92,8 +155,19 @@ final class ApiWorkflowTest extends ApiTestCase
         self::assertArrayNotHasKey('ficheTechnique', $preparation);
         self::assertNotEmpty($preparation['preparationsMateriel']);
 
+        $client->request('GET', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/preparations-materiel', ['headers' => $headers]);
+        self::assertResponseIsSuccessful();
+        self::assertCount(count($preparation['preparationsMateriel']), $client->getResponse()->toArray());
+
         $client->request('POST', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/validation', ['headers' => $headers]);
         self::assertResponseStatusCodeSame(409);
+        self::assertSame('MATERIEL_PREPARATION_INCOMPLETE', $client->getResponse()->toArray(false)['errorCode']);
+
+        $client->request('PATCH', '/api/preparations-materiel/'.$preparation['preparationsMateriel'][0]['id'].'/cocher', [
+            'headers' => $headers + ['Content-Type' => 'application/merge-patch+json'],
+            'json' => [],
+        ]);
+        self::assertResponseStatusCodeSame(422);
 
         foreach ($preparation['preparationsMateriel'] as $item) {
             $client->request('PATCH', '/api/preparations-materiel/'.$item['id'].'/cocher', [
@@ -126,7 +200,7 @@ final class ApiWorkflowTest extends ApiTestCase
     {
         $client = static::createClient();
         $token = $this->login($client, 'user@chirorg.test');
-        $chirurgie = $this->chirurgieRepository()->findOneBy(['salle' => 'Salle B']);
+        $chirurgie = $this->chirurgieRepository()->findOneBy(['salle' => 'Salle B', 'valide' => false]);
         self::assertInstanceOf(ChirurgiePlanifiee::class, $chirurgie);
 
         $client->request('GET', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/vue-finale', ['headers' => $this->headers($token)]);

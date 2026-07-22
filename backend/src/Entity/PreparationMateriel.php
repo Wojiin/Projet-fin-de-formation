@@ -3,17 +3,17 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
-use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
-use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use App\Dto\PreparationMaterielInput;
 use App\Repository\PreparationMaterielRepository;
 use App\State\PreparationMaterielCocherProcessor;
-use App\State\PreparationMaterielParChirurgieProvider;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -24,16 +24,18 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'État de préparation d’un matériel pour une chirurgie planifiée.',
     operations: [
-        new GetCollection(uriTemplate: '/preparations-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['preparation_materiel:list']], openapi: new OpenApiOperation(summary: 'Lister les préparations matériel', description: 'Retourne les lignes de préparation matériel avec leur état coché ou non coché.')),
-        new GetCollection(uriTemplate: '/chirurgies-planifiees/{id}/preparations-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['preparation_materiel:read']], provider: PreparationMaterielParChirurgieProvider::class, openapi: new OpenApiOperation(summary: 'Lister la préparation d’une chirurgie', description: 'Retourne les matériels à préparer pour une chirurgie planifiée donnée.')),
+        new GetCollection(uriTemplate: '/preparations-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['preparation_materiel:list']], parameters: [
+            'chirurgiePlanifiee' => new QueryParameter(property: 'chirurgiePlanifiee', filter: new ExactFilter()),
+            'materiel' => new QueryParameter(property: 'materiel', filter: new ExactFilter()),
+            'coche' => new QueryParameter(property: 'coche', filter: new ExactFilter(), schema: ['type' => 'boolean'], castToNativeType: true),
+        ], openapi: new OpenApiOperation(summary: 'Lister les préparations matériel', description: 'Retourne les lignes de préparation matériel avec leur état coché ou non coché.')),
+        new GetCollection(uriTemplate: '/chirurgies-planifiees/{id}/preparations-materiel', uriVariables: ['id' => new Link(fromClass: ChirurgiePlanifiee::class, toProperty: 'chirurgiePlanifiee')], security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['preparation_materiel:read']], order: ['id' => 'ASC'], openapi: new OpenApiOperation(summary: 'Lister la préparation d’une chirurgie', description: 'Retourne les matériels à préparer pour une chirurgie planifiée donnée.')),
         new Get(uriTemplate: '/preparations-materiel/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['preparation_materiel:read']], openapi: new OpenApiOperation(summary: 'Consulter une préparation matériel', description: 'Retourne le détail d’une ligne de préparation matériel.')),
-        new Patch(uriTemplate: '/preparations-materiel/{id}', security: "is_granted('ROLE_USER')", denormalizationContext: ['groups' => ['preparation_materiel:write']], normalizationContext: ['groups' => ['preparation_materiel:read']], processor: PreparationMaterielCocherProcessor::class, openapi: new OpenApiOperation(summary: 'Modifier l’état de préparation', description: 'Met à jour l’état coché d’un matériel dans une préparation.')),
-        new Patch(uriTemplate: '/preparations-materiel/{id}/cocher', security: "is_granted('ROLE_USER')", denormalizationContext: ['groups' => ['preparation_materiel:write']], normalizationContext: ['groups' => ['preparation_materiel:read']], processor: PreparationMaterielCocherProcessor::class, openapi: new OpenApiOperation(summary: 'Cocher ou décocher un matériel', description: 'Change l’état de préparation d’un matériel et conserve l’utilisateur ayant effectué l’action.')),
+        new Patch(uriTemplate: '/preparations-materiel/{id}', security: "is_granted('ROLE_USER')", read: false, input: PreparationMaterielInput::class, output: PreparationMateriel::class, normalizationContext: ['groups' => ['preparation_materiel:read']], processor: PreparationMaterielCocherProcessor::class, openapi: new OpenApiOperation(summary: 'Modifier l’état de préparation', description: 'Met à jour l’état coché d’un matériel dans une préparation.')),
+        new Patch(uriTemplate: '/preparations-materiel/{id}/cocher', security: "is_granted('ROLE_USER')", read: false, input: PreparationMaterielInput::class, output: PreparationMateriel::class, normalizationContext: ['groups' => ['preparation_materiel:read']], processor: PreparationMaterielCocherProcessor::class, openapi: new OpenApiOperation(summary: 'Cocher ou décocher un matériel', description: 'Change l’état de préparation d’un matériel et conserve l’utilisateur ayant effectué l’action.')),
         new Delete(uriTemplate: '/preparations-materiel/{id}', security: "is_granted('ROLE_ADMIN')", openapi: new OpenApiOperation(summary: 'Supprimer une préparation matériel', description: 'Supprime une ligne de préparation matériel.')),
     ]
 )]
-#[ApiFilter(SearchFilter::class, properties: ['chirurgiePlanifiee' => 'exact', 'materiel' => 'exact'])]
-#[ApiFilter(BooleanFilter::class, properties: ['coche'])]
 class PreparationMateriel
 {
     #[ORM\Id]
