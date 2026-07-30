@@ -37,8 +37,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/listes-materiel/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une liste de matériel', description: 'Supprime une liste de matériel si elle n’est pas référencée par une préparation.')),
     ]
 )]
+/** Définit le matériel requis pour un couple chirurgien / chirurgie modèle. */
 class ListeMateriel
 {
+    // Les accesseurs décrivent le couple de référence et la collection de matériels qui en découle.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -65,6 +67,7 @@ class ListeMateriel
     #[Groups(['liste_materiel:read', 'liste_materiel:write', 'preparation:read'])]
     private Collection $materiels;
 
+    /** Initialise la collection des matériels de la liste. */
     public function __construct()
     {
         $this->materiels = new ArrayCollection();
@@ -114,6 +117,7 @@ class ListeMateriel
         return $this->materiels;
     }
 
+    /** Ajoute un matériel sans doublon à la liste utilisée lors des préparations. */
     public function addMateriel(Materiel $materiel): static
     {
         if (!$this->materiels->contains($materiel)) {
@@ -122,6 +126,7 @@ class ListeMateriel
         return $this;
     }
 
+    /** Retire un matériel de la liste de référence. */
     public function removeMateriel(Materiel $materiel): static
     {
         $this->materiels->removeElement($materiel);

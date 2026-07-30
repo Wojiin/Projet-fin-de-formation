@@ -12,8 +12,10 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity(repositoryClass: RefreshTokenRepository::class)]
 #[ORM\Table(name: 'refresh_token')]
+/** Entité de persistance des refresh tokens liés à un utilisateur ChirOrg. */
 class RefreshToken implements RefreshTokenInterface
 {
+    // Les méthodes implémentent le contrat du bundle de refresh token et relient le token à son utilisateur.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -32,6 +34,10 @@ class RefreshToken implements RefreshTokenInterface
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     private ?User $user = null;
 
+    /**
+     * Construit un refresh token expirant après le délai configuré et le rattache
+     * à l'utilisateur ChirOrg quand son type permet de conserver cette relation.
+     */
     public static function createForUserWithTtl(string $refreshToken, UserInterface $user, int $ttl): static
     {
         $valid = new DateTime();
@@ -49,6 +55,7 @@ class RefreshToken implements RefreshTokenInterface
         return $token;
     }
 
+    /** Retourne le token sous forme texte lorsque le bundle doit l'émettre ou le comparer. */
     public function __toString(): string
     {
         return $this->refreshToken ?? '';
@@ -95,6 +102,7 @@ class RefreshToken implements RefreshTokenInterface
         return $this->username;
     }
 
+    /** Indique si la date de validité du refresh token n'est pas dépassée. */
     public function isValid(): bool
     {
         return null !== $this->valid && $this->valid >= new DateTime();

@@ -10,6 +10,7 @@ use App\Service\ChirurgieValidationService;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
+/** Délègue la validation d'une chirurgie au service après identification de l'utilisateur connecté. */
 final readonly class ChirurgieValidationProcessor implements ProcessorInterface
 {
     public function __construct(
@@ -18,6 +19,7 @@ final readonly class ChirurgieValidationProcessor implements ProcessorInterface
     ) {
     }
 
+    /** Vérifie le contexte de sécurité puis applique la règle de validation métier. */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): ChirurgiePlanifiee
     {
         if (!$data instanceof ChirurgiePlanifiee) {

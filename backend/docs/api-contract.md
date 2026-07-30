@@ -36,6 +36,14 @@ Retour : liste regroupée par jour, salle et chirurgien, destinée à la page d�
 
 Retourne le détail d’un programme avec les chirurgies planifiées et leurs lignes de préparation. Le front coche une ligne via `PATCH /preparations-materiel/{id}/cocher`, puis valide la chirurgie via `POST /chirurgies-planifiees/{id}/validation`.
 
+### `POST /programmes-operatoires` — `ROLE_USER`
+
+Planifie en une seule transaction plusieurs modèles de chirurgie pour un jour, une salle et un chirurgien communs. Le tableau `chirurgieModeleIds` définit l’ordre initial et chaque préparation matériel est initialisée.
+
+### `PATCH /programmes-operatoires/{date}/{salle}/{chirurgien}/ordre` — `ROLE_USER`
+
+Reçoit `{"chirurgieIds":[3,1,2]}`. La liste doit contenir exactement chaque chirurgie du programme une fois ; les ordres sont recalculés de `1` à `n` dans une transaction unique.
+
 ### `GET /programmes-operatoires/{date}/{salle}/{chirurgien}/vue-finale` — `ROLE_USER`
 
 Retourne uniquement les chirurgies validées du programme, en lecture seule, avec les fiches techniques de leur chirurgie modèle. Erreurs : `400` date ou chirurgien invalide, `404` programme absent.
@@ -60,7 +68,11 @@ Retourne la chirurgie validée, l’utilisateur validateur, le matériel présen
 
 ## Administration
 
-Les routes `/users`, `/chirurgiens`, `/chirurgie-modeles`, `/fiches-techniques`, `/materiels` et `/listes-materiel` sont modifiables par `ROLE_ADMIN`. Les lectures des référentiels sont accessibles à `ROLE_USER`. Une suppression d’une ressource utilisée retourne `409` :
+Les routes `/users`, `/specialites`, `/chirurgiens`, `/chirurgie-modeles`, `/fiches-techniques`, `/materiels` et `/listes-materiel` sont modifiables par `ROLE_ADMIN`. Les lectures des référentiels sont accessibles à `ROLE_USER`. Les chirurgiens, modèles de chirurgie et matériels référencent une spécialité chirurgicale.
+
+La spécialité système `Sans spécialité` sert de valeur de repli et ne peut pas être supprimée. Lorsqu’un administrateur supprime une autre spécialité, ses chirurgiens, matériels et modèles de chirurgie sont automatiquement réaffectés à cette spécialité système avant la suppression.
+
+Une suppression d’une autre ressource utilisée retourne `409` :
 
 ```json
 {

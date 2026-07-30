@@ -9,6 +9,7 @@ use Doctrine\Persistence\ManagerRegistry;
 /**
  * @extends ServiceEntityRepository<FicheTechnique>
  */
+/** Dépôt Doctrine des consignes techniques associées aux chirurgies modèles. */
 class FicheTechniqueRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

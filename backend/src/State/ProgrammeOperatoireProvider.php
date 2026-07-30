@@ -11,12 +11,20 @@ use DateTimeImmutable;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
+/**
+ * Traduit les paramètres HTTP en critères métier et délègue la lecture des
+ * programmes agrégés au service dédié.
+ */
 final readonly class ProgrammeOperatoireProvider implements ProviderInterface
 {
     public function __construct(private ProgrammeOperatoireService $service)
     {
     }
 
+    /**
+     * Retourne un programme ciblé ou une collection filtrée, en validant les dates
+     * et identifiants avant toute lecture en base.
+     */
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): ProgrammeOperatoire|array
     {
         if (isset($uriVariables['salle'], $uriVariables['chirurgien'], $uriVariables['date'])) {
@@ -51,7 +59,6 @@ final readonly class ProgrammeOperatoireProvider implements ProviderInterface
 
         if (null === $dateDebutValue && null === $dateFinValue) {
             return $this->service->getProgrammes(
-                date: new DateTimeImmutable('today'),
                 salle: $salle,
                 chirurgienId: $chirurgienId,
             );
@@ -71,6 +78,7 @@ final readonly class ProgrammeOperatoireProvider implements ProviderInterface
         );
     }
 
+    /** Lit un paramètre API Platform et normalise l'absence de valeur en null. */
     private function parameter(Operation $operation, string $name): mixed
     {
         $value = $operation->getParameters()?->get($name)?->getValue();
@@ -78,6 +86,7 @@ final readonly class ProgrammeOperatoireProvider implements ProviderInterface
         return $value instanceof ParameterNotFound ? null : $value;
     }
 
+    /** Valide strictement le format de date fonctionnel YYYY-MM-DD. */
     private function parseDate(string $value): DateTimeImmutable
     {
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);

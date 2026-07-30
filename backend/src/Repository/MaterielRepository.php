@@ -9,6 +9,7 @@ use Doctrine\Persistence\ManagerRegistry;
 /**
  * @extends ServiceEntityRepository<Materiel>
  */
+/** Dépôt Doctrine du catalogue de matériel opératoire. */
 class MaterielRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

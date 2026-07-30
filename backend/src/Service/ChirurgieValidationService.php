@@ -7,12 +7,20 @@ use App\Entity\User;
 use App\Exception\ApiProblemException;
 use Doctrine\ORM\EntityManagerInterface;
 
+/**
+ * Applique la règle de clôture d'une chirurgie : une chirurgie n'est validable
+ * que lorsque chacune de ses préparations de matériel est cochée.
+ */
 final readonly class ChirurgieValidationService
 {
     public function __construct(private EntityManagerInterface $entityManager)
     {
     }
 
+    /**
+     * Valide la chirurgie et mémorise l'utilisateur ainsi que la date de validation.
+     * La méthode est idempotente afin qu'une seconde demande ne modifie pas l'historique.
+     */
     public function validate(ChirurgiePlanifiee $chirurgie, User $user): ChirurgiePlanifiee
     {
         if ($chirurgie->isValide()) {

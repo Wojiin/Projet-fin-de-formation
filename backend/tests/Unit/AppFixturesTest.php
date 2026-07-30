@@ -10,6 +10,7 @@ use App\Entity\FicheTechnique;
 use App\Entity\ListeMateriel;
 use App\Entity\Materiel;
 use App\Entity\PreparationMateriel;
+use App\Entity\Specialite;
 use App\Entity\User;
 use Doctrine\Persistence\ObjectManager;
 use PHPUnit\Framework\TestCase;
@@ -33,7 +34,7 @@ final class AppFixturesTest extends TestCase
 
         $manager = $this->createMock(ObjectManager::class);
         $manager
-            ->expects(self::exactly(684))
+            ->expects(self::exactly(696))
             ->method('persist')
             ->willReturnCallback(function (object $entity): void {
                 $this->entities[] = $entity;
@@ -46,13 +47,43 @@ final class AppFixturesTest extends TestCase
     public function testFixturesCreentLeBonNombreDentites(): void
     {
         self::assertCount(2, $this->entitiesOfType(User::class));
+        self::assertCount(6, $this->entitiesOfType(Specialite::class));
         self::assertCount(5, $this->entitiesOfType(Chirurgien::class));
         self::assertCount(20, $this->entitiesOfType(ChirurgieModele::class));
         self::assertCount(60, $this->entitiesOfType(FicheTechnique::class));
         self::assertCount(100, $this->entitiesOfType(Materiel::class));
         self::assertCount(100, $this->entitiesOfType(ListeMateriel::class));
         self::assertCount(30, $this->entitiesOfType(ChirurgiePlanifiee::class));
-        self::assertCount(367, $this->entitiesOfType(PreparationMateriel::class));
+        self::assertCount(373, $this->entitiesOfType(PreparationMateriel::class));
+    }
+
+    public function testSpecialitesRelientLesReferentielsChirurgicaux(): void
+    {
+        $specialites = $this->entitiesOfType(Specialite::class);
+        self::assertContains('Urologie', array_map(
+            static fn (Specialite $specialite): ?string => $specialite->getIntitule(),
+            $specialites,
+        ));
+        self::assertContains(Specialite::SANS_SPECIALITE, array_map(
+            static fn (Specialite $specialite): ?string => $specialite->getIntitule(),
+            $specialites,
+        ));
+
+        foreach ($this->entitiesOfType(Chirurgien::class) as $chirurgien) {
+            self::assertInstanceOf(Specialite::class, $chirurgien->getSpecialite());
+        }
+        foreach ($this->entitiesOfType(Materiel::class) as $materiel) {
+            self::assertInstanceOf(Specialite::class, $materiel->getSpecialite());
+        }
+        foreach ($this->entitiesOfType(ChirurgieModele::class) as $modele) {
+            self::assertInstanceOf(Specialite::class, $modele->getSpecialite());
+        }
+        foreach ($this->entitiesOfType(ChirurgiePlanifiee::class) as $chirurgie) {
+            self::assertSame(
+                $chirurgie->getChirurgien()?->getSpecialite(),
+                $chirurgie->getChirurgieModele()?->getSpecialite(),
+            );
+        }
     }
 
     public function testFixturesCreentLesComptesUtilisateurEtAdministrateur(): void
@@ -116,7 +147,7 @@ final class AppFixturesTest extends TestCase
             static fn (ListeMateriel $liste): int => $liste->getMateriels()->count(),
             $listes,
         ), 0, 5));
-        self::assertSame([10, 11, 13, 14, 10], array_slice(array_map(
+        self::assertSame([10, 11, 11, 12, 14], array_slice(array_map(
             static fn (ChirurgiePlanifiee $chirurgie): int => $chirurgie->getPreparationsMateriel()->count(),
             $chirurgies,
         ), 0, 5));

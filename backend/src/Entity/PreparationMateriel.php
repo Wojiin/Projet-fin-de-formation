@@ -36,8 +36,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/preparations-materiel/{id}', security: "is_granted('ROLE_ADMIN')", openapi: new OpenApiOperation(summary: 'Supprimer une préparation matériel', description: 'Supprime une ligne de préparation matériel.')),
     ]
 )]
+/** Trace l'état et l'auteur de la préparation d'un matériel pour une chirurgie donnée. */
 class PreparationMateriel
 {
+    // Les accesseurs permettent au processeur métier de modifier l'état et sa traçabilité.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]

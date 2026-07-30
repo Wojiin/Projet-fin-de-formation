@@ -9,17 +9,23 @@ use App\Entity\FicheTechnique;
 use App\Entity\ListeMateriel;
 use App\Entity\Materiel;
 use App\Entity\PreparationMateriel;
+use App\Entity\Specialite;
 use App\Entity\User;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
+/**
+ * Constitue un jeu de données cohérent pour démontrer les règles de planification,
+ * de checklist et de validation sans dépendre de données de production.
+ */
 final class AppFixtures extends Fixture
 {
     public function __construct(private readonly UserPasswordHasherInterface $passwordHasher)
     {
     }
 
+    /** Crée les utilisateurs, référentiels, programmes et états de préparation de démonstration. */
     public function load(ObjectManager $manager): void
     {
         $admin = $this->createUser('admin@chirorg.test', ['ROLE_ADMIN']);
@@ -27,21 +33,32 @@ final class AppFixtures extends Fixture
         $manager->persist($admin);
         $manager->persist($user);
 
+        $specialites = [];
+        foreach (['Orthopédie', 'Chirurgie viscérale et digestive', 'Chirurgie générale', 'Traumatologie', 'Urologie', Specialite::SANS_SPECIALITE] as $intitule) {
+            $specialite = (new Specialite())->setIntitule($intitule);
+            $specialites[] = $specialite;
+            $manager->persist($specialite);
+        }
+
         $chirurgiens = [
-            $this->createChirurgien('Jean', 'Dupont', 'Orthopedie'),
-            $this->createChirurgien('Claire', 'Martin', 'Chirurgie viscerale'),
-            $this->createChirurgien('Alain', 'Bernard', 'Chirurgie generale'),
-            $this->createChirurgien('Nadia', 'Petit', 'Traumatologie'),
-            $this->createChirurgien('Hugo', 'Leroy', 'Chirurgie ambulatoire'),
+            $this->createChirurgien('Jean', 'Dupont', $specialites[0]),
+            $this->createChirurgien('Claire', 'Martin', $specialites[1]),
+            $this->createChirurgien('Alain', 'Bernard', $specialites[2]),
+            $this->createChirurgien('Nadia', 'Petit', $specialites[3]),
+            $this->createChirurgien('Hugo', 'Leroy', $specialites[4]),
         ];
         foreach ($chirurgiens as $chirurgien) {
             $manager->persist($chirurgien);
         }
 
         $modeles = [];
-        foreach ($this->getChirurgieModeleNames() as $intitule) {
-            $modele = (new ChirurgieModele())->setIntitule($intitule);
+        $modelesParSpecialite = array_fill(0, count($specialites) - 1, []);
+        foreach ($this->getChirurgieModeleData() as [$intitule, $specialiteIndex]) {
+            $modele = (new ChirurgieModele())
+                ->setIntitule($intitule)
+                ->setSpecialite($specialites[$specialiteIndex]);
             $modeles[] = $modele;
+            $modelesParSpecialite[$specialiteIndex][] = $modele;
             $manager->persist($modele);
 
             foreach ($this->createFichesTechniques($modele, $intitule) as $fiche) {
@@ -50,8 +67,12 @@ final class AppFixtures extends Fixture
         }
 
         $materiels = [];
-        foreach ($this->createMaterielsData() as [$intitule, $adresse, $type]) {
-            $materiel = (new Materiel())->setIntitule($intitule)->setAdresse($adresse)->setTypeMateriel($type);
+        foreach ($this->createMaterielsData() as $materielIndex => [$intitule, $adresse, $type]) {
+            $materiel = (new Materiel())
+                ->setIntitule($intitule)
+                ->setAdresse($adresse)
+                ->setTypeMateriel($type)
+                ->setSpecialite($specialites[$materielIndex % (count($specialites) - 1)]);
             $materiels[] = $materiel;
             $manager->persist($materiel);
         }
@@ -80,17 +101,16 @@ final class AppFixtures extends Fixture
         for ($chirurgieIndex = 0; $chirurgieIndex < 30; ++$chirurgieIndex) {
             $groupeIndex = intdiv($chirurgieIndex, 2);
             $chirurgienIndex = $groupeIndex % count($chirurgiens);
-            $modeleIndex = $chirurgieIndex % count($modeles);
-            $date = $aujourdhui
-                ->modify(sprintf('+%d day', intdiv($chirurgieIndex, 6)))
-                ->setTime(8 + (($chirurgieIndex % 2) * 2), 0);
+            $modele = $modelesParSpecialite[$chirurgienIndex][$chirurgieIndex % count($modelesParSpecialite[$chirurgienIndex])];
+            $modeleIndex = array_search($modele, $modeles, true);
+            $date = $aujourdhui->modify(sprintf('+%d day', intdiv($chirurgieIndex, 6)));
 
             $chirurgie = $this->createChirurgie(
                 $date,
                 $salles[$groupeIndex % count($salles)],
                 ($chirurgieIndex % 2) + 1,
                 $chirurgiens[$chirurgienIndex],
-                $modeles[$modeleIndex],
+                $modele,
             );
 
             $chirurgies[] = $chirurgie;
@@ -117,17 +137,20 @@ final class AppFixtures extends Fixture
         $manager->flush();
     }
 
+    /** Crée un utilisateur de fixture en chiffrant le mot de passe de démonstration. */
     private function createUser(string $email, array $roles): User
     {
         $user = (new User())->setEmail($email)->setRoles($roles);
         return $user->setPassword($this->passwordHasher->hashPassword($user, 'password'));
     }
 
-    private function createChirurgien(string $prenom, string $nom, string $specialite): Chirurgien
+    /** Crée un chirurgien relié à la spécialité attendue par les référentiels. */
+    private function createChirurgien(string $prenom, string $nom, Specialite $specialite): Chirurgien
     {
         return (new Chirurgien())->setPrenom($prenom)->setNom($nom)->setSpecialite($specialite);
     }
 
+    /** Crée une chirurgie planifiée avec son identité de programme et son ordre initial. */
     private function createChirurgie(\DateTimeImmutable $date, string $salle, int $ordre, Chirurgien $chirurgien, ChirurgieModele $modele): ChirurgiePlanifiee
     {
         return (new ChirurgiePlanifiee())
@@ -138,36 +161,38 @@ final class AppFixtures extends Fixture
             ->setChirurgieModele($modele);
     }
 
-    /**
-     * @return list<string>
+    /** Retourne les modèles de chirurgie et l'index de leur spécialité de fixture.
+     *
+     * @return list<array{string, int}>
      */
-    private function getChirurgieModeleNames(): array
+    private function getChirurgieModeleData(): array
     {
         return [
-            'Prothese totale de genou',
-            'Prothese totale de hanche',
-            'Appendicectomie',
-            'Cholecystectomie coelioscopique',
-            'Arthroscopie epaule',
-            'Arthroscopie genou',
-            'Canal carpien',
-            'Hernie inguinale',
-            'Coelioscopie exploratrice',
-            'Ligamentoplastie croise anterieur',
-            'Osteosynthese cheville',
-            'Osteosynthese poignet',
-            'Ablation materiel orthopedique',
-            'Cure eventration',
-            'Thyroidectomie partielle',
-            'Biopsie ganglionnaire',
-            'Suture tendon achille',
-            'Reparation coiffe rotateurs',
-            'Hemicolectomie droite',
-            'Pose chambre implantable',
+            ['Prothèse totale de genou', 0],
+            ['Prothèse totale de hanche', 0],
+            ['Arthroscopie de l’épaule', 0],
+            ['Arthroscopie du genou', 0],
+            ['Appendicectomie', 1],
+            ['Cholécystectomie cœlioscopique', 1],
+            ['Hernie inguinale', 1],
+            ['Hémicolectomie droite', 1],
+            ['Thyroïdectomie partielle', 2],
+            ['Biopsie ganglionnaire', 2],
+            ['Pose de chambre implantable', 2],
+            ['Cure d’éventration', 2],
+            ['Ligamentoplastie du croisé antérieur', 3],
+            ['Ostéosynthèse de cheville', 3],
+            ['Ostéosynthèse de poignet', 3],
+            ['Suture du tendon d’Achille', 3],
+            ['Résection transurétrale de prostate', 4],
+            ['Urétéroscopie', 4],
+            ['Néphrectomie', 4],
+            ['Prostatectomie', 4],
         ];
     }
 
-    /**
+    /** Construit les étapes techniques minimales communes à un modèle de chirurgie.
+     *
      * @return list<FicheTechnique>
      */
     private function createFichesTechniques(ChirurgieModele $modele, string $intitule): array
@@ -190,7 +215,8 @@ final class AppFixtures extends Fixture
         return $fiches;
     }
 
-    /**
+    /** Génère le catalogue de matériel de démonstration réparti dans les salles de stockage.
+     *
      * @return list<array{string, string, string}>
      */
     private function createMaterielsData(): array
@@ -237,7 +263,8 @@ final class AppFixtures extends Fixture
         return $materiels;
     }
 
-    /**
+    /** Sélectionne de façon déterministe un sous-ensemble de matériel pour une liste.
+     *
      * @param list<Materiel> $materiels
      *
      * @return list<Materiel>

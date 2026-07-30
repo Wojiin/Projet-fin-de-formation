@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -27,7 +28,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new GetCollection(uriTemplate: '/chirurgiens', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgien:list']], parameters: [
             'nom' => new QueryParameter(property: 'nom', filter: new PartialSearchFilter()),
             'prenom' => new QueryParameter(property: 'prenom', filter: new PartialSearchFilter()),
-            'specialite' => new QueryParameter(property: 'specialite', filter: new PartialSearchFilter()),
+            'specialite' => new QueryParameter(property: 'specialite', filter: new ExactFilter()),
         ], openapi: new OpenApiOperation(summary: 'Lister les chirurgiens', description: 'Retourne les chirurgiens enregistrés dans le référentiel.')),
         new Get(uriTemplate: '/chirurgiens/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgien:read']], openapi: new OpenApiOperation(summary: 'Consulter un chirurgien', description: 'Retourne le détail d’un chirurgien à partir de son identifiant.')),
         new Post(uriTemplate: '/chirurgiens', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['chirurgien:write']], normalizationContext: ['groups' => ['chirurgien:read']], openapi: new OpenApiOperation(summary: 'Créer un chirurgien', description: 'Ajoute un chirurgien au référentiel de planification.')),
@@ -35,8 +36,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/chirurgiens/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer un chirurgien', description: 'Supprime un chirurgien si aucune donnée liée ne bloque la suppression.')),
     ]
 )]
+/** Référentiel des praticiens pouvant porter un programme et une liste de matériel. */
 class Chirurgien
 {
+    // Les accesseurs exposent l'identité du praticien ; les méthodes de collection synchronisent les relations Doctrine.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -55,10 +58,11 @@ class Chirurgien
     #[Assert\Length(max: 100)]
     private ?string $nom = null;
 
-    #[ORM\Column(length: 150, nullable: true)]
+    #[ORM\ManyToOne(inversedBy: 'chirurgiens')]
+    #[ORM\JoinColumn(nullable: false)]
     #[Groups(['chirurgien:read', 'chirurgien:list', 'chirurgien:write', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
-    #[Assert\Length(max: 150)]
-    private ?string $specialite = null;
+    #[Assert\NotNull]
+    private ?Specialite $specialite = null;
 
     /** @var Collection<int, ListeMateriel> */
     #[ORM\OneToMany(targetEntity: ListeMateriel::class, mappedBy: 'chirurgien')]
@@ -68,6 +72,7 @@ class Chirurgien
     #[ORM\OneToMany(targetEntity: ChirurgiePlanifiee::class, mappedBy: 'chirurgien')]
     private Collection $chirurgiesPlanifiees;
 
+    /** Initialise les collections de listes et de chirurgies du praticien. */
     public function __construct()
     {
         $this->listesMateriel = new ArrayCollection();
@@ -101,12 +106,12 @@ class Chirurgien
         return $this;
     }
 
-    public function getSpecialite(): ?string
+    public function getSpecialite(): ?Specialite
     {
         return $this->specialite;
     }
 
-    public function setSpecialite(?string $specialite): static
+    public function setSpecialite(?Specialite $specialite): static
     {
         $this->specialite = $specialite;
         return $this;
@@ -118,6 +123,7 @@ class Chirurgien
         return $this->listesMateriel;
     }
 
+    /** Associe une liste de matériel au chirurgien en maintenant la relation inverse. */
     public function addListeMateriel(ListeMateriel $liste): static
     {
         if (!$this->listesMateriel->contains($liste)) {
@@ -127,6 +133,7 @@ class Chirurgien
         return $this;
     }
 
+    /** Retire une liste de matériel de la collection du chirurgien. */
     public function removeListeMateriel(ListeMateriel $liste): static
     {
         $this->listesMateriel->removeElement($liste);
@@ -139,6 +146,7 @@ class Chirurgien
         return $this->chirurgiesPlanifiees;
     }
 
+    /** Associe une chirurgie planifiée au chirurgien et synchronise son inverse. */
     public function addChirurgiePlanifiee(ChirurgiePlanifiee $chirurgie): static
     {
         if (!$this->chirurgiesPlanifiees->contains($chirurgie)) {
@@ -148,6 +156,7 @@ class Chirurgien
         return $this;
     }
 
+    /** Retire une chirurgie planifiée de la collection du chirurgien. */
     public function removeChirurgiePlanifiee(ChirurgiePlanifiee $chirurgie): static
     {
         $this->chirurgiesPlanifiees->removeElement($chirurgie);

@@ -37,8 +37,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/users/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer un utilisateur', description: 'Supprime un compte utilisateur si aucune donnée métier ne le référence.')),
     ]
 )]
+/** Utilisateur de l'intranet, responsable des validations et de la traçabilité des préparations. */
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    // Les accesseurs de sécurité sont complétés par des collections qui conservent les traces métier de l'utilisateur.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -83,6 +85,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: PreparationMateriel::class, mappedBy: 'cochePar')]
     private Collection $preparationsCochees;
 
+    /** Initialise les collections de traces métier et de refresh tokens de l'utilisateur. */
     public function __construct()
     {
         $this->refreshTokens = new ArrayCollection();
@@ -112,6 +115,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      *
      * @see UserInterface
      */
+    /** Retourne l'email comme identifiant stable exigé par Symfony Security. */
     public function getUserIdentifier(): string
     {
         return (string) $this->email;
@@ -120,6 +124,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @see UserInterface
      */
+    /** Garantit le rôle minimal ROLE_USER, même lorsqu'aucun rôle explicite n'est stocké. */
     public function getRoles(): array
     {
         $roles = $this->roles;
@@ -172,6 +177,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->refreshTokens;
     }
 
+    /** Associe un refresh token à son propriétaire et synchronise l'inverse. */
     public function addRefreshToken(RefreshToken $token): static
     {
         if (!$this->refreshTokens->contains($token)) {
@@ -181,6 +187,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /** Retire un refresh token et libère sa relation utilisateur. */
     public function removeRefreshToken(RefreshToken $token): static
     {
         if ($this->refreshTokens->removeElement($token) && $token->getUser() === $this) {
@@ -195,6 +202,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->chirurgiesValidees;
     }
 
+    /** Lie une validation de chirurgie à son auteur pour conserver l'audit. */
     public function addChirurgieValidee(ChirurgiePlanifiee $chirurgie): static
     {
         if (!$this->chirurgiesValidees->contains($chirurgie)) {
@@ -204,6 +212,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /** Retire une validation de la collection d'audit de l'utilisateur. */
     public function removeChirurgieValidee(ChirurgiePlanifiee $chirurgie): static
     {
         if ($this->chirurgiesValidees->removeElement($chirurgie) && $chirurgie->getValidePar() === $this) {
@@ -218,6 +227,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->preparationsCochees;
     }
 
+    /** Lie une ligne cochée à son auteur afin de préserver la traçabilité. */
     public function addPreparationCochee(PreparationMateriel $preparation): static
     {
         if (!$this->preparationsCochees->contains($preparation)) {
@@ -227,6 +237,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /** Retire une ligne cochée de la collection d'audit de l'utilisateur. */
     public function removePreparationCochee(PreparationMateriel $preparation): static
     {
         if ($this->preparationsCochees->removeElement($preparation) && $preparation->getCochePar() === $this) {
@@ -235,9 +246,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * Ensure the session doesn't contain actual password hashes by CRC32C-hashing them, as supported since Symfony 7.3.
-     */
+    /** Remplace le hash réel par une empreinte dans la session afin de ne jamais l'y exposer. */
     public function __serialize(): array
     {
         $data = (array) $this;

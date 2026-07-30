@@ -10,6 +10,10 @@ use App\Service\PreparationMaterielInitializer;
 use DateTimeInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
+/**
+ * Fournit la checklist de préparation d'une chirurgie et la crée à la première
+ * consultation si elle n'a pas encore été matérialisée.
+ */
 final readonly class ChirurgiePreparationProvider implements ProviderInterface
 {
     public function __construct(
@@ -18,6 +22,9 @@ final readonly class ChirurgiePreparationProvider implements ProviderInterface
     ) {
     }
 
+    /**
+     * Charge la chirurgie, garantit ses lignes de préparation puis calcule la progression.
+     */
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): ChirurgiePreparation
     {
         $id = (int) ($uriVariables['id'] ?? 0);
@@ -53,7 +60,7 @@ final readonly class ChirurgiePreparationProvider implements ProviderInterface
 
         return new ChirurgiePreparation(
             id: $chirurgie->getId() ?? 0,
-            dateProgrammee: $chirurgie->getDateProgrammee()?->format(DateTimeInterface::ATOM) ?? '',
+            dateProgrammee: $chirurgie->getDateProgrammee()?->format('Y-m-d') ?? '',
             salle: $chirurgie->getSalle() ?? '',
             ordre: $chirurgie->getOrdre(),
             valide: $chirurgie->isValide(),

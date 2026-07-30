@@ -9,6 +9,10 @@ use App\Exception\ApiProblemException;
 use App\Repository\ListeMaterielRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
+/**
+ * Résout la liste de matériel adaptée à une chirurgie et crée les lignes de
+ * préparation manquantes sans dupliquer celles déjà créées.
+ */
 final readonly class PreparationMaterielInitializer
 {
     public function __construct(
@@ -17,6 +21,10 @@ final readonly class PreparationMaterielInitializer
     ) {
     }
 
+    /**
+     * Recherche la liste définie pour le couple chirurgien / chirurgie modèle.
+     * Ce couple est obligatoire pour garantir une préparation reproductible.
+     */
     public function findListe(ChirurgiePlanifiee $chirurgie): ListeMateriel
     {
         $chirurgien = $chirurgie->getChirurgien();
@@ -32,7 +40,11 @@ final readonly class PreparationMaterielInitializer
         );
     }
 
-    public function initializeForChirurgie(ChirurgiePlanifiee $chirurgie): void
+    /**
+     * Initialise les préparations d'une chirurgie non validée à partir de sa liste.
+     * Le flush est optionnel pour permettre une création atomique d'un programme.
+     */
+    public function initializeForChirurgie(ChirurgiePlanifiee $chirurgie, bool $flush = true): void
     {
         if ($chirurgie->isValide()) {
             throw new ApiProblemException('PREPARATION_VERROUILLEE', 'Le matériel d’une chirurgie validée ne peut plus être initialisé.');
@@ -59,6 +71,8 @@ final readonly class PreparationMaterielInitializer
             $this->entityManager->persist($preparation);
         }
 
-        $this->entityManager->flush();
+        if ($flush) {
+            $this->entityManager->flush();
+        }
     }
 }

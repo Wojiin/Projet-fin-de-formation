@@ -28,8 +28,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/fiches-techniques/{id}', security: "is_granted('ROLE_ADMIN')", openapi: new OpenApiOperation(summary: 'Supprimer une fiche technique', description: 'Supprime une consigne technique du référentiel.')),
     ]
 )]
+/** Décrit une consigne ordonnée réutilisable pour une chirurgie modèle. */
 class FicheTechnique
 {
+    // Les accesseurs exposent les consignes, leur ordre d'affichage et leur modèle propriétaire.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]

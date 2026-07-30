@@ -9,6 +9,7 @@ use Doctrine\Persistence\ManagerRegistry;
 /**
  * @extends ServiceEntityRepository<Chirurgien>
  */
+/** Dépôt Doctrine du référentiel des chirurgiens. */
 class ChirurgienRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)

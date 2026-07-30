@@ -2,7 +2,7 @@
 
 namespace App\Dto;
 
-/** Vue utilisee par la page d accueil. */
+/** Résumé de programme destiné à la liste d'accueil, sans charger chaque chirurgie. */
 final class ProgrammeOperatoireResume
 {
     /** @param array{id: int|null, prenom: string|null, nom: string|null} $chirurgien */

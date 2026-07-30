@@ -9,13 +9,21 @@ use App\Entity\PreparationMateriel;
 use App\Repository\ChirurgiePlanifieeRepository;
 use DateTimeInterface;
 
+/**
+ * Agrège les chirurgies planifiées sous la forme de programmes opératoires
+ * consommables par l'API, avec leurs compteurs et leur progression matériel.
+ */
 final readonly class ProgrammeOperatoireService
 {
     public function __construct(private ChirurgiePlanifieeRepository $repository)
     {
     }
 
-    /** @return list<ProgrammeOperatoireResume> */
+    /**
+     * Construit les résumés de programmes selon les filtres de date, salle et chirurgien.
+     *
+     * @return list<ProgrammeOperatoireResume>
+     */
     public function getProgrammes(?DateTimeInterface $date = null, ?DateTimeInterface $dateDebut = null, ?DateTimeInterface $dateFin = null, ?string $salle = null, ?int $chirurgienId = null): array
     {
         $programmes = [];
@@ -38,6 +46,10 @@ final readonly class ProgrammeOperatoireService
         ));
     }
 
+    /**
+     * Construit le détail ordonné d'un programme unique.
+     * Le mode vue finale limite la lecture aux chirurgies validées et à leurs fiches.
+     */
     public function getProgramme(DateTimeInterface $date, string $salle, int $chirurgienId, bool $vueFinale = false): ?ProgrammeOperatoire
     {
         $chirurgies = $this->repository->findForProgrammeOperatoire(
@@ -51,6 +63,14 @@ final readonly class ProgrammeOperatoireService
         if ([] === $chirurgies) {
             return null;
         }
+
+        usort($chirurgies, static function (ChirurgiePlanifiee $left, ChirurgiePlanifiee $right): int {
+            $orderComparison = ($left->getOrdre() ?? PHP_INT_MAX) <=> ($right->getOrdre() ?? PHP_INT_MAX);
+
+            return 0 !== $orderComparison
+                ? $orderComparison
+                : ($left->getId() ?? PHP_INT_MAX) <=> ($right->getId() ?? PHP_INT_MAX);
+        });
 
         $programme = $this->newProgrammeData($chirurgies[0]);
         $items = [];
@@ -70,7 +90,11 @@ final readonly class ProgrammeOperatoireService
         );
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Initialise l'agrégat technique utilisé pour compter les chirurgies et préparations.
+     *
+     * @return array<string, mixed>
+     */
     private function newProgrammeData(ChirurgiePlanifiee $chirurgie): array
     {
         $chirurgien = $chirurgie->getChirurgien();
@@ -85,7 +109,11 @@ final readonly class ProgrammeOperatoireService
         ];
     }
 
-    /** @param array<string, mixed> $programme */
+    /**
+     * Ajoute une chirurgie aux compteurs d'un programme sans construire son détail.
+     *
+     * @param array<string, mixed> $programme
+     */
     private function addChirurgieToProgramme(array &$programme, ChirurgiePlanifiee $chirurgie): void
     {
         ++$programme['nombreChirurgies'];
@@ -103,7 +131,11 @@ final readonly class ProgrammeOperatoireService
         $programme['progressionPreparation']['complete'] = $progression['total'] > 0 && $progression['total'] === $progression['coches'];
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Transforme une chirurgie en représentation API et, si demandé, joint ses fiches.
+     *
+     * @return array<string, mixed>
+     */
     private function chirurgieData(ChirurgiePlanifiee $chirurgie, bool $includeFichesTechniques): array
     {
         $preparations = [];
@@ -115,8 +147,7 @@ final readonly class ProgrammeOperatoireService
         $modele = $chirurgie->getChirurgieModele();
         $data = [
             'id' => $chirurgie->getId() ?? 0,
-            'heure' => $chirurgie->getDateProgrammee()?->format('H:i') ?? '',
-            'dateProgrammee' => $chirurgie->getDateProgrammee()?->format(DateTimeInterface::ATOM) ?? '',
+            'dateProgrammee' => $chirurgie->getDateProgrammee()?->format('Y-m-d') ?? '',
             'ordre' => $chirurgie->getOrdre(),
             'valide' => $chirurgie->isValide(),
             'valideLe' => $chirurgie->getValideLe()?->format(DateTimeInterface::ATOM),
@@ -134,7 +165,11 @@ final readonly class ProgrammeOperatoireService
         return $data;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Transforme une ligne de préparation et son matériel pour les sorties API.
+     *
+     * @return array<string, mixed>
+     */
     private function preparationData(PreparationMateriel $preparation): array
     {
         $materiel = $preparation->getMateriel();
@@ -147,12 +182,17 @@ final readonly class ProgrammeOperatoireService
         ];
     }
 
+    /** Construit la clé de regroupement stable date / salle / chirurgien. */
     private function programmeKey(ChirurgiePlanifiee $chirurgie): string
     {
         return implode('|', [$chirurgie->getDateProgrammee()?->format('Y-m-d'), $chirurgie->getSalle(), $chirurgie->getChirurgien()?->getId()]);
     }
 
-    /** @param array<string, mixed> $programme */
+    /**
+     * Produit l'identifiant fonctionnel exposé pour un programme agrégé.
+     *
+     * @param array<string, mixed> $programme
+     */
     private function programmeId(array $programme): string
     {
         return sprintf('%s-%s-%s', $programme['date'], $programme['salle'], $programme['chirurgien']['id']);

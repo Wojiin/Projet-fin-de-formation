@@ -14,6 +14,10 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
+/**
+ * Change l'état d'une ligne de préparation en conservant sa traçabilité et en
+ * interdisant toute modification après validation de la chirurgie.
+ */
 final readonly class PreparationMaterielCocherProcessor implements ProcessorInterface
 {
     public function __construct(
@@ -23,6 +27,10 @@ final readonly class PreparationMaterielCocherProcessor implements ProcessorInte
     ) {
     }
 
+    /**
+     * Coche ou décoche une préparation, renseigne ou efface son auteur et sa date,
+     * puis enregistre la transition.
+     */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): PreparationMateriel
     {
         if (!$data instanceof PreparationMaterielInput || null === $data->coche) {

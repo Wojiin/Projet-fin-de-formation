@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Doctrine\Orm\Filter\ExactFilter;
 use ApiPlatform\Doctrine\Orm\Filter\PartialSearchFilter;
 use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\Metadata\Delete;
@@ -26,6 +27,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(uriTemplate: '/chirurgie-modeles', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_modele:list']], parameters: [
             'intitule' => new QueryParameter(property: 'intitule', filter: new PartialSearchFilter()),
+            'specialite' => new QueryParameter(property: 'specialite', filter: new ExactFilter()),
         ], openapi: new OpenApiOperation(summary: 'Lister les chirurgies modèles', description: 'Retourne le référentiel des interventions types disponibles pour la planification.')),
         new Get(uriTemplate: '/chirurgie-modeles/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgie_modele:read']], openapi: new OpenApiOperation(summary: 'Consulter une chirurgie modèle', description: 'Retourne le détail d’une intervention type à partir de son identifiant.')),
         new Post(uriTemplate: '/chirurgie-modeles', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['chirurgie_modele:write']], normalizationContext: ['groups' => ['chirurgie_modele:read']], openapi: new OpenApiOperation(summary: 'Créer une chirurgie modèle', description: 'Ajoute une nouvelle intervention type au référentiel.')),
@@ -33,8 +35,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/chirurgie-modeles/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une chirurgie modèle', description: 'Supprime une intervention type si elle n’est pas utilisée par des données liées.')),
     ]
 )]
+/** Référentiel d'interventions types : spécialité, fiches techniques et listes de matériel associées. */
 class ChirurgieModele
 {
+    // Les accesseurs exposent les attributs du référentiel ; les méthodes add/remove maintiennent les relations Doctrine.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -46,6 +50,12 @@ class ChirurgieModele
     #[Assert\NotBlank]
     #[Assert\Length(max: 150)]
     private ?string $intitule = null;
+
+    #[ORM\ManyToOne(inversedBy: 'chirurgiesModeles')]
+    #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['chirurgie_modele:read', 'chirurgie_modele:list', 'chirurgie_modele:write', 'fiche_technique:read', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Assert\NotNull]
+    private ?Specialite $specialite = null;
 
     /** @var Collection<int, FicheTechnique> */
     #[ORM\OneToMany(targetEntity: FicheTechnique::class, mappedBy: 'chirurgieModele', orphanRemoval: true)]
@@ -60,6 +70,7 @@ class ChirurgieModele
     #[ORM\OneToMany(targetEntity: ChirurgiePlanifiee::class, mappedBy: 'chirurgieModele')]
     private Collection $chirurgiesPlanifiees;
 
+    /** Initialise les collections relationnelles maintenues des deux côtés. */
     public function __construct()
     {
         $this->fichesTechniques = new ArrayCollection();
@@ -83,12 +94,25 @@ class ChirurgieModele
         return $this;
     }
 
+    public function getSpecialite(): ?Specialite
+    {
+        return $this->specialite;
+    }
+
+    public function setSpecialite(?Specialite $specialite): static
+    {
+        $this->specialite = $specialite;
+
+        return $this;
+    }
+
     /** @return Collection<int, FicheTechnique> */
     public function getFichesTechniques(): Collection
     {
         return $this->fichesTechniques;
     }
 
+    /** Attache une fiche technique en synchronisant la relation inverse. */
     public function addFicheTechnique(FicheTechnique $fiche): static
     {
         if (!$this->fichesTechniques->contains($fiche)) {
@@ -98,6 +122,7 @@ class ChirurgieModele
         return $this;
     }
 
+    /** Retire une fiche technique et libère sa relation avec le modèle. */
     public function removeFicheTechnique(FicheTechnique $fiche): static
     {
         if ($this->fichesTechniques->removeElement($fiche) && $fiche->getChirurgieModele() === $this) {
@@ -112,6 +137,7 @@ class ChirurgieModele
         return $this->listesMateriel;
     }
 
+    /** Attache une liste de matériel au modèle en maintenant la relation inverse. */
     public function addListeMateriel(ListeMateriel $liste): static
     {
         if (!$this->listesMateriel->contains($liste)) {
@@ -121,6 +147,7 @@ class ChirurgieModele
         return $this;
     }
 
+    /** Retire une liste liée de la collection locale. */
     public function removeListeMateriel(ListeMateriel $liste): static
     {
         $this->listesMateriel->removeElement($liste);
@@ -133,6 +160,7 @@ class ChirurgieModele
         return $this->chirurgiesPlanifiees;
     }
 
+    /** Associe une chirurgie planifiée au modèle et synchronise son inverse. */
     public function addChirurgiePlanifiee(ChirurgiePlanifiee $chirurgie): static
     {
         if (!$this->chirurgiesPlanifiees->contains($chirurgie)) {
@@ -142,6 +170,7 @@ class ChirurgieModele
         return $this;
     }
 
+    /** Retire une chirurgie planifiée de la collection du modèle. */
     public function removeChirurgiePlanifiee(ChirurgiePlanifiee $chirurgie): static
     {
         $this->chirurgiesPlanifiees->removeElement($chirurgie);

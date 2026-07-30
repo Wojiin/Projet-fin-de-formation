@@ -29,6 +29,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             'intitule' => new QueryParameter(property: 'intitule', filter: new PartialSearchFilter()),
             'typeMateriel' => new QueryParameter(property: 'typeMateriel', filter: new ExactFilter()),
             'adresse' => new QueryParameter(property: 'adresse', filter: new PartialSearchFilter()),
+            'specialite' => new QueryParameter(property: 'specialite', filter: new ExactFilter()),
         ], openapi: new OpenApiOperation(summary: 'Lister le matériel', description: 'Retourne le référentiel du matériel utilisé pour les préparations opératoires.')),
         new Get(uriTemplate: '/materiels/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['materiel:read']], openapi: new OpenApiOperation(summary: 'Consulter un matériel', description: 'Retourne le détail d’un matériel à partir de son identifiant.')),
         new Post(uriTemplate: '/materiels', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['materiel:write']], normalizationContext: ['groups' => ['materiel:read']], openapi: new OpenApiOperation(summary: 'Créer un matériel', description: 'Ajoute un matériel au référentiel.')),
@@ -36,8 +37,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/materiels/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer un matériel', description: 'Supprime un matériel si aucune liste ou préparation ne le référence.')),
     ]
 )]
+/** Référentiel d'un élément matériel et de sa localisation de stockage. */
 class Materiel
 {
+    // Les accesseurs décrivent le matériel ; les méthodes de collection en maintiennent les utilisations référentielles.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -57,6 +60,12 @@ class Materiel
     #[Assert\Length(max: 100)]
     private ?string $typeMateriel = null;
 
+    #[ORM\ManyToOne(inversedBy: 'materiels')]
+    #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['materiel:read', 'materiel:list', 'materiel:write', 'liste_materiel:read', 'preparation_materiel:read', 'preparation:read', 'vue_finale:read'])]
+    #[Assert\NotNull]
+    private ?Specialite $specialite = null;
+
     /** @var Collection<int, ListeMateriel> */
     #[ORM\ManyToMany(targetEntity: ListeMateriel::class, mappedBy: 'materiels')]
     private Collection $listesMateriel;
@@ -64,6 +73,7 @@ class Materiel
     #[ORM\OneToMany(targetEntity: PreparationMateriel::class, mappedBy: 'materiel', orphanRemoval: true)]
     private Collection $preparationsMateriel;
 
+    /** Initialise les collections de listes et de préparations qui référencent ce matériel. */
     public function __construct()
     {
         $this->listesMateriel = new ArrayCollection();
@@ -108,12 +118,25 @@ class Materiel
         return $this;
     }
 
+    public function getSpecialite(): ?Specialite
+    {
+        return $this->specialite;
+    }
+
+    public function setSpecialite(?Specialite $specialite): static
+    {
+        $this->specialite = $specialite;
+
+        return $this;
+    }
+
     /** @return Collection<int, ListeMateriel> */
     public function getListesMateriel(): Collection
     {
         return $this->listesMateriel;
     }
 
+    /** Ajoute une liste utilisatrice et synchronise la relation many-to-many. */
     public function addListeMateriel(ListeMateriel $liste): static
     {
         if (!$this->listesMateriel->contains($liste)) {
@@ -123,6 +146,7 @@ class Materiel
         return $this;
     }
 
+    /** Retire une liste utilisatrice et synchronise la relation inverse. */
     public function removeListeMateriel(ListeMateriel $liste): static
     {
         if ($this->listesMateriel->removeElement($liste)) {
@@ -137,6 +161,7 @@ class Materiel
         return $this->preparationsMateriel;
     }
 
+    /** Rattache une ligne de préparation au matériel concerné. */
     public function addPreparationMateriel(PreparationMateriel $preparation): static
     {
         if (!$this->preparationsMateriel->contains($preparation)) {
@@ -146,6 +171,7 @@ class Materiel
         return $this;
     }
 
+    /** Retire une ligne de préparation du matériel. */
     public function removePreparationMateriel(PreparationMateriel $preparation): static
     {
         if ($this->preparationsMateriel->removeElement($preparation) && $preparation->getMateriel() === $this) {

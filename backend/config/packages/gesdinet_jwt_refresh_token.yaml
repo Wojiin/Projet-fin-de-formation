@@ -10,3 +10,13 @@ gesdinet_jwt_refresh_token:
         http_only: true
         path: /
         remove_token_from_body: true
+
+when@dev:
+    gesdinet_jwt_refresh_token:
+        cookie:
+            secure: false
+
+when@test:
+    gesdinet_jwt_refresh_token:
+        cookie:
+            secure: false

@@ -5,8 +5,14 @@ namespace App\Tests\Functional;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\DataFixtures\AppFixtures;
+use App\Entity\Chirurgien;
+use App\Entity\ChirurgieModele;
 use App\Entity\ChirurgiePlanifiee;
+use App\Entity\Materiel;
+use App\Entity\Specialite;
 use App\Repository\ChirurgiePlanifieeRepository;
+use App\Repository\ListeMaterielRepository;
+use App\Repository\SpecialiteRepository;
 use Doctrine\Common\DataFixtures\Purger\ORMPurger;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -39,6 +45,10 @@ final class ApiWorkflowTest extends ApiTestCase
         $cookies = $client->getResponse()->getHeaders(false)['set-cookie'] ?? [];
         self::assertStringContainsString('refresh_token=', implode('; ', $cookies));
 
+        $client->request('POST', '/api/token/refresh');
+        self::assertResponseIsSuccessful();
+        self::assertArrayHasKey('token', $client->getResponse()->toArray());
+
         $client->request('POST', '/api/logout');
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('refresh_token=deleted', implode('; ', $client->getResponse()->getHeaders(false)['set-cookie'] ?? []));
@@ -59,6 +69,10 @@ final class ApiWorkflowTest extends ApiTestCase
         $me = $client->getResponse()->toArray();
         self::assertSame('user@chirorg.test', $me['email']);
         self::assertArrayNotHasKey('password', $me);
+
+        $client->request('GET', '/api/specialites', ['headers' => $this->headers($token)]);
+        self::assertResponseIsSuccessful();
+        self::assertContains('Urologie', array_column($client->getResponse()->toArray(), 'intitule'));
 
         $client->request('GET', '/api/users', ['headers' => $this->headers($token)]);
         self::assertResponseStatusCodeSame(403);
@@ -81,7 +95,10 @@ final class ApiWorkflowTest extends ApiTestCase
         self::assertNotEmpty($programme);
         self::assertArrayHasKey('progressionPreparation', $programme[0]);
         self::assertArrayHasKey('nombreChirurgies', $programme[0]);
-        self::assertGreaterThanOrEqual(2, $programme[0]['nombreChirurgies']);
+        self::assertNotEmpty(array_filter(
+            $programme,
+            static fn (array $item): bool => $item['nombreChirurgies'] >= 2,
+        ));
 
         $date = $programme[0]['date'];
         $client->request('GET', '/api/programmes-operatoires?date='.$date, ['headers' => $headers]);
@@ -138,6 +155,79 @@ final class ApiWorkflowTest extends ApiTestCase
 
         $client->request('GET', '/api/programmes-operatoires?inconnu=valeur', ['headers' => $headers]);
         self::assertResponseStatusCodeSame(400);
+    }
+
+    public function testPlanificationGroupeeEtReordonnancementDuProgramme(): void
+    {
+        $client = static::createClient();
+        $token = $this->login($client, 'user@chirorg.test');
+        $headers = $this->headers($token);
+        $listes = static::getContainer()->get(ListeMaterielRepository::class)->findAll();
+        self::assertNotEmpty($listes);
+
+        $premiereListe = $listes[0];
+        $listesDuChirurgien = array_values(array_filter(
+            $listes,
+            static fn ($liste): bool => $liste->getChirurgien()?->getId() === $premiereListe->getChirurgien()?->getId(),
+        ));
+        self::assertGreaterThanOrEqual(2, count($listesDuChirurgien));
+
+        $chirurgienId = $premiereListe->getChirurgien()?->getId();
+        $modeleIds = [
+            $listesDuChirurgien[0]->getChirurgieModele()?->getId(),
+            $listesDuChirurgien[1]->getChirurgieModele()?->getId(),
+        ];
+        self::assertIsInt($chirurgienId);
+        self::assertNotContains(null, $modeleIds);
+
+        $client->request('POST', '/api/programmes-operatoires', [
+            'headers' => $headers + ['Content-Type' => 'application/json'],
+            'json' => [
+                'dateProgrammee' => (new \DateTimeImmutable('today'))->format('Y-m-d'),
+                'salle' => 'Salle Test Programme',
+                'chirurgienId' => $chirurgienId,
+                'chirurgieModeleIds' => $modeleIds,
+            ],
+        ]);
+        self::assertResponseStatusCodeSame(422);
+
+        $programmeDate = new \DateTimeImmutable('+2 days');
+        $client->request('POST', '/api/programmes-operatoires', [
+            'headers' => $headers + ['Content-Type' => 'application/json'],
+            'json' => [
+                'dateProgrammee' => $programmeDate->format('Y-m-d'),
+                'salle' => 'Salle Test Programme',
+                'chirurgienId' => $chirurgienId,
+                'chirurgieModeleIds' => $modeleIds,
+            ],
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $programme = $client->getResponse()->toArray();
+        self::assertCount(2, $programme['chirurgies']);
+        self::assertSame([1, 2], array_column($programme['chirurgies'], 'ordre'));
+        foreach ($programme['chirurgies'] as $chirurgie) {
+            self::assertSame($programmeDate->format('Y-m-d'), $chirurgie['dateProgrammee']);
+            self::assertStringNotContainsString('T', $chirurgie['dateProgrammee']);
+            self::assertArrayNotHasKey('heure', $chirurgie);
+        }
+
+        $client->request('GET', '/api/programmes-operatoires', ['headers' => $headers]);
+        self::assertResponseIsSuccessful();
+        self::assertContains($programmeDate->format('Y-m-d'), array_column($client->getResponse()->toArray(), 'date'));
+
+        $idsInverses = array_reverse(array_column($programme['chirurgies'], 'id'));
+        $client->request(
+            'PATCH',
+            sprintf('/api/programmes-operatoires/%s/%s/%d/ordre', $programmeDate->format('Y-m-d'), rawurlencode('Salle Test Programme'), $chirurgienId),
+            [
+                'headers' => $headers + ['Content-Type' => 'application/merge-patch+json'],
+                'json' => ['chirurgieIds' => $idsInverses],
+            ],
+        );
+        self::assertResponseIsSuccessful();
+        $programmeReordonne = $client->getResponse()->toArray();
+        self::assertSame($idsInverses, array_column($programmeReordonne['chirurgies'], 'id'));
+        self::assertSame([1, 2], array_column($programmeReordonne['chirurgies'], 'ordre'));
     }
 
     public function testPreparationAndValidationWorkflow(): void
@@ -205,6 +295,40 @@ final class ApiWorkflowTest extends ApiTestCase
 
         $client->request('GET', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/vue-finale', ['headers' => $this->headers($token)]);
         self::assertResponseStatusCodeSame(409);
+    }
+
+    public function testSuppressionSpecialiteReaffecteToutesLesReferences(): void
+    {
+        $client = static::createClient();
+        $adminToken = $this->login($client, 'admin@chirorg.test');
+        $headers = $this->headers($adminToken);
+        $repository = static::getContainer()->get(SpecialiteRepository::class);
+
+        $specialite = $repository->findOneBy(['intitule' => 'Orthopédie']);
+        $specialiteParDefaut = $repository->findDefault();
+        self::assertInstanceOf(Specialite::class, $specialite);
+        self::assertInstanceOf(Specialite::class, $specialiteParDefaut);
+
+        $chirurgienId = $specialite->getChirurgiens()->first()?->getId();
+        $materielId = $specialite->getMateriels()->first()?->getId();
+        $modeleId = $specialite->getChirurgiesModeles()->first()?->getId();
+        self::assertIsInt($chirurgienId);
+        self::assertIsInt($materielId);
+        self::assertIsInt($modeleId);
+
+        $client->request('DELETE', '/api/specialites/'.$specialite->getId(), ['headers' => $headers]);
+        self::assertResponseStatusCodeSame(204);
+
+        $entityManager = static::getContainer()->get(EntityManagerInterface::class);
+        $entityManager->clear();
+        $specialiteParDefautId = $specialiteParDefaut->getId();
+        self::assertSame($specialiteParDefautId, $entityManager->find(Chirurgien::class, $chirurgienId)?->getSpecialite()?->getId());
+        self::assertSame($specialiteParDefautId, $entityManager->find(Materiel::class, $materielId)?->getSpecialite()?->getId());
+        self::assertSame($specialiteParDefautId, $entityManager->find(ChirurgieModele::class, $modeleId)?->getSpecialite()?->getId());
+
+        $client->request('DELETE', '/api/specialites/'.$specialiteParDefautId, ['headers' => $headers]);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('DEFAULT_SPECIALITE_PROTECTED', $client->getResponse()->toArray(false)['errorCode']);
     }
 
     private function login(Client $client, string $email): string

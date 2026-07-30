@@ -11,6 +11,7 @@ use Doctrine\Persistence\ManagerRegistry;
 /**
  * @extends ServiceEntityRepository<ListeMateriel>
  */
+/** Accède aux listes de matériel définies pour chaque couple chirurgien / modèle. */
 class ListeMaterielRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -18,6 +19,7 @@ class ListeMaterielRepository extends ServiceEntityRepository
         parent::__construct($registry, ListeMateriel::class);
     }
 
+    /** Retourne la liste unique et ses matériels pour initialiser une préparation. */
     public function findOneForChirurgienAndChirurgieModele(
         Chirurgien $chirurgien,
         ChirurgieModele $chirurgieModele,

@@ -14,6 +14,10 @@ use App\Exception\ApiProblemException;
 use App\Repository\ChirurgiePlanifieeRepository;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
+/**
+ * Protège les suppressions de référentiels et d'objets métier encore reliés à
+ * des données opérationnelles ou à une trace de sécurité.
+ */
 final readonly class ReferenceDeleteProcessor implements ProcessorInterface
 {
     public function __construct(
@@ -23,6 +27,10 @@ final readonly class ReferenceDeleteProcessor implements ProcessorInterface
     ) {
     }
 
+    /**
+     * Refuse la suppression lorsque l'objet est utilisé, sinon délègue au
+     * processeur Doctrine standard.
+     */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
         $used = match (true) {

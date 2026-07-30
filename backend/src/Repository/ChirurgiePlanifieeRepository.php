@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\ChirurgiePlanifiee;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use DateTimeImmutable;
@@ -12,6 +13,7 @@ use DateTimeInterface;
 /**
  * @extends ServiceEntityRepository<ChirurgiePlanifiee>
  */
+/** Centralise les requêtes de lecture nécessaires aux programmes, préparations et vues finales. */
 class ChirurgiePlanifieeRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -19,7 +21,12 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
         parent::__construct($registry, ChirurgiePlanifiee::class);
     }
 
-    /** @return list<ChirurgiePlanifiee> */
+    /**
+     * Charge les chirurgies d'un ou plusieurs programmes avec leurs relations
+     * nécessaires, en appliquant les filtres métier fournis.
+     *
+     * @return list<ChirurgiePlanifiee>
+     */
     public function findForProgrammeOperatoire(
         ?DateTimeInterface $date = null,
         ?DateTimeInterface $dateDebut = null,
@@ -32,19 +39,16 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
         $qb = $this->baseDataQuery();
 
         if (null !== $date) {
-            $debut = DateTimeImmutable::createFromInterface($date)->setTime(0, 0);
-            $fin = $debut->setTime(23, 59, 59, 999999);
-            $qb->andWhere('chirurgie.dateProgrammee BETWEEN :debut AND :fin')
-                ->setParameter('debut', $debut)
-                ->setParameter('fin', $fin);
+            $qb->andWhere('chirurgie.dateProgrammee = :date')
+                ->setParameter('date', DateTimeImmutable::createFromInterface($date), Types::DATE_IMMUTABLE);
         } else {
             if (null !== $dateDebut) {
                 $qb->andWhere('chirurgie.dateProgrammee >= :dateDebut')
-                    ->setParameter('dateDebut', DateTimeImmutable::createFromInterface($dateDebut)->setTime(0, 0));
+                    ->setParameter('dateDebut', DateTimeImmutable::createFromInterface($dateDebut), Types::DATE_IMMUTABLE);
             }
             if (null !== $dateFin) {
                 $qb->andWhere('chirurgie.dateProgrammee <= :dateFin')
-                    ->setParameter('dateFin', DateTimeImmutable::createFromInterface($dateFin)->setTime(23, 59, 59, 999999));
+                    ->setParameter('dateFin', DateTimeImmutable::createFromInterface($dateFin), Types::DATE_IMMUTABLE);
             }
         }
 
@@ -75,6 +79,7 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** Charge une chirurgie avec sa checklist complète pour l'écran de préparation. */
     public function findPreparationData(int $id): ?ChirurgiePlanifiee
     {
         return $this->baseDataQuery()
@@ -84,6 +89,7 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /** Charge les données de clôture, y compris les fiches techniques du modèle. */
     public function findVueFinaleData(int $id): ?ChirurgiePlanifiee
     {
         return $this->baseDataQuery()
@@ -95,6 +101,7 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /** Construit la jointure commune évitant les requêtes N+1 sur les programmes. */
     private function baseDataQuery(): QueryBuilder
     {
         return $this->createQueryBuilder('chirurgie')

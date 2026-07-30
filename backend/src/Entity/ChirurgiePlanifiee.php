@@ -23,8 +23,11 @@ use App\State\VueFinaleProvider;
 use App\State\ReferenceDeleteProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Attribute\Context;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ChirurgiePlanifieeRepository::class)]
@@ -52,15 +55,18 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une chirurgie planifiée', description: 'Supprime une chirurgie planifiée si les règles métier l’autorisent.')),
     ]
 )]
+/** Représente une intervention datée, ordonnée dans un programme et suivie jusqu'à sa validation. */
 class ChirurgiePlanifiee
 {
+    // Les accesseurs portent les attributs de planification et de validation manipulés par les processeurs métier.
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'programme:read', 'preparation:read', 'vue_finale:read', 'preparation_materiel:read'])]
     private ?int $id = null;
-    #[ORM\Column]
+    #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'chirurgie_planifiee:write', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Context([DateTimeNormalizer::FORMAT_KEY => 'Y-m-d'])]
     #[Assert\NotNull]
     private ?\DateTimeImmutable $dateProgrammee = null;
     #[ORM\Column(length: 50)]
@@ -69,7 +75,7 @@ class ChirurgiePlanifiee
     #[Assert\Length(max: 50)]
     private ?string $salle = null;
     #[ORM\Column(nullable: true)]
-    #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'chirurgie_planifiee:write', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     #[Assert\PositiveOrZero]
     private ?int $ordre = null;
     #[ORM\Column(options: ['default' => false])]
@@ -98,6 +104,7 @@ class ChirurgiePlanifiee
     #[Groups(['preparation:read', 'vue_finale:read'])]
     private Collection $preparationsMateriel;
 
+    /** Initialise la checklist matériel vide avant son alimentation par le service métier. */
     public function __construct()
     {
         $this->preparationsMateriel = new ArrayCollection();
@@ -202,6 +209,7 @@ class ChirurgiePlanifiee
         return $this->preparationsMateriel;
     }
 
+    /** Ajoute une ligne de checklist et synchronise sa chirurgie propriétaire. */
     public function addPreparationMateriel(PreparationMateriel $preparation): static
     {
         if (!$this->preparationsMateriel->contains($preparation)) {
@@ -211,6 +219,7 @@ class ChirurgiePlanifiee
         return $this;
     }
 
+    /** Retire une ligne de checklist et libère correctement la relation inverse. */
     public function removePreparationMateriel(PreparationMateriel $preparation): static
     {
         if ($this->preparationsMateriel->removeElement($preparation) && $preparation->getChirurgiePlanifiee() === $this) {

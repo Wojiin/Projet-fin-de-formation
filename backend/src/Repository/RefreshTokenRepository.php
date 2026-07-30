@@ -12,6 +12,7 @@ use Gesdinet\JWTRefreshTokenBundle\Doctrine\RefreshTokenRepositoryInterface;
 /**
  * @extends ServiceEntityRepository<RefreshToken>
  */
+/** Implémente les requêtes attendues par le bundle de nettoyage des refresh tokens. */
 class RefreshTokenRepository extends ServiceEntityRepository implements RefreshTokenRepositoryInterface
 {
     public function __construct(ManagerRegistry $registry)
@@ -19,6 +20,7 @@ class RefreshTokenRepository extends ServiceEntityRepository implements RefreshT
         parent::__construct($registry, RefreshToken::class);
     }
 
+    /** Retourne tous les refresh tokens expirés à la date de référence. */
     public function findInvalid(?DateTimeInterface $datetime = null): iterable
     {
         return $this->createQueryBuilder('refreshToken')
@@ -28,6 +30,7 @@ class RefreshTokenRepository extends ServiceEntityRepository implements RefreshT
             ->getResult();
     }
 
+    /** Retourne une page de refresh tokens expirés pour le nettoyage par lots. */
     public function findInvalidBatch(?DateTimeInterface $datetime = null, ?int $batchSize = null, int $offset = 0): iterable
     {
         return $this->createQueryBuilder('refreshToken')

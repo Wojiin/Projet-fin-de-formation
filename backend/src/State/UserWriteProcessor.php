@@ -10,6 +10,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
+/** Garantit qu'aucun mot de passe en clair n'est persisté pour un utilisateur. */
 final readonly class UserWriteProcessor implements ProcessorInterface
 {
     public function __construct(
@@ -19,6 +20,10 @@ final readonly class UserWriteProcessor implements ProcessorInterface
     ) {
     }
 
+    /**
+     * Exige un mot de passe à la création, chiffre toute nouvelle valeur puis
+     * délègue la persistance à Doctrine.
+     */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): User
     {
         if (!$data instanceof User) {

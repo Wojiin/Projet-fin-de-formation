@@ -5,9 +5,13 @@ namespace App\Dto;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\QueryParameter;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
 use App\State\ProgrammeOperatoireProvider;
+use App\State\ProgrammeOrdreProcessor;
+use App\State\ProgrammePlanificationProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ApiResource(
@@ -49,8 +53,32 @@ use Symfony\Component\Validator\Constraints as Assert;
                 description: 'Retourne uniquement les chirurgies validees, en lecture seule, avec leurs fiches techniques.',
             ),
         ),
+        new Post(
+            uriTemplate: '/programmes-operatoires',
+            input: ProgrammePlanificationInput::class,
+            output: ProgrammePlanificationOutput::class,
+            processor: ProgrammePlanificationProcessor::class,
+            security: "is_granted('ROLE_USER')",
+            openapi: new OpenApiOperation(
+                summary: 'Planifier un programme opératoire',
+                description: 'Ajoute plusieurs modèles de chirurgie dans un programme commun et initialise leur matériel.',
+            ),
+        ),
+        new Patch(
+            uriTemplate: '/programmes-operatoires/{date}/{salle}/{chirurgien}/ordre',
+            read: false,
+            input: ProgrammeOrdreInput::class,
+            output: self::class,
+            processor: ProgrammeOrdreProcessor::class,
+            security: "is_granted('ROLE_USER')",
+            openapi: new OpenApiOperation(
+                summary: 'Réordonner les chirurgies d’un programme',
+                description: 'Recalcule atomiquement l’ordre de toutes les chirurgies du programme.',
+            ),
+        ),
     ],
 )]
+/** DTO agrégé représentant le détail ordonné d'un programme opératoire. */
 final class ProgrammeOperatoire
 {
     /**

@@ -10,12 +10,20 @@ use App\Repository\ChirurgiePlanifieeRepository;
 use DateTimeInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
+/**
+ * Produit la synthèse finale d'une chirurgie validée, avec les matériels prêts
+ * et les fiches techniques de son modèle.
+ */
 final readonly class VueFinaleProvider implements ProviderInterface
 {
     public function __construct(private ChirurgiePlanifieeRepository $repository)
     {
     }
 
+    /**
+     * Refuse l'accès avant validation puis projette les données nécessaires à la
+     * vue finale en lecture seule.
+     */
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): ChirurgieVueFinale
     {
         $chirurgie = $this->repository->findVueFinaleData((int) ($uriVariables['id'] ?? 0))
@@ -57,7 +65,7 @@ final readonly class VueFinaleProvider implements ProviderInterface
 
         return new ChirurgieVueFinale(
             id: $chirurgie->getId() ?? 0,
-            dateProgrammee: $chirurgie->getDateProgrammee()?->format(DateTimeInterface::ATOM) ?? '',
+            dateProgrammee: $chirurgie->getDateProgrammee()?->format('Y-m-d') ?? '',
             salle: $chirurgie->getSalle() ?? '',
             ordre: $chirurgie->getOrdre(),
             valide: true,
