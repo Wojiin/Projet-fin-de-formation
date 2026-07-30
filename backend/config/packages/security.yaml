@@ -17,11 +17,14 @@ security:
             security: false
 
         refresh:
-            pattern: ^/api/token/refresh
+            pattern: ^/api/(token/refresh|logout)$
             stateless: true
             provider: app_user_provider
             refresh_jwt:
                 check_path: /api/token/refresh
+                invalidate_token_on_logout: true
+            logout:
+                path: /api/logout
 
         login:
             pattern: ^/api/login
