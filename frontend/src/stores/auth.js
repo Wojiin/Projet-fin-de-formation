@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { authApi } from '@/services/authApi'
-import { getApiErrorMessage, refreshAccessToken } from '@/api/axios'
+import { accountApi } from '@/services/accountApi'
+import { getApiErrorMessage } from '@/api/response'
 import { getUserFromAccessToken } from '@/utils/jwt'
 
 // Empêche plusieurs gardes de route de lancer simultanément le même refresh silencieux.
@@ -44,7 +45,7 @@ export const useAuthStore = defineStore('auth', {
 
     /** Récupère le profil associé au JWT courant pour compléter la session en mémoire. */
     async fetchMe() {
-      const user = await authApi.me()
+      const user = await accountApi.getCurrent()
       this.user = user
       return user
     },
@@ -89,7 +90,7 @@ export const useAuthStore = defineStore('auth', {
       initializationPromise = (async () => {
         try {
           if (!this.token) {
-            this.setAccessToken(await refreshAccessToken())
+            this.setAccessToken(await authApi.refreshSession())
           }
           await this.hydrateUser(this.token)
           return true

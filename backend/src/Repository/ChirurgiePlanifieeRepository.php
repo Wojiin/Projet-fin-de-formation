@@ -82,21 +82,26 @@ class ChirurgiePlanifieeRepository extends ServiceEntityRepository
     /** Charge une chirurgie avec sa checklist complète pour l'écran de préparation. */
     public function findPreparationData(int $id): ?ChirurgiePlanifiee
     {
-        return $this->baseDataQuery()
-            ->andWhere('chirurgie.id = :id')
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult();
+        return $this->findOneWithRelations($id);
     }
 
     /** Charge les données de clôture, y compris les fiches techniques du modèle. */
     public function findVueFinaleData(int $id): ?ChirurgiePlanifiee
     {
-        return $this->baseDataQuery()
-            ->leftJoin('modele.fichesTechniques', 'fiche')
-            ->addSelect('fiche')
+        return $this->findOneWithRelations($id, withTechnicalSheets: true);
+    }
+
+    private function findOneWithRelations(int $id, bool $withTechnicalSheets = false): ?ChirurgiePlanifiee
+    {
+        $query = $this->baseDataQuery()
             ->andWhere('chirurgie.id = :id')
-            ->setParameter('id', $id)
+            ->setParameter('id', $id);
+
+        if ($withTechnicalSheets) {
+            $query->leftJoin('modele.fichesTechniques', 'fiche')->addSelect('fiche');
+        }
+
+        return $query
             ->getQuery()
             ->getOneOrNullResult();
     }

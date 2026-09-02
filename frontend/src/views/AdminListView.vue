@@ -1,129 +1,62 @@
 <script setup>
-/** Vue de consultation d'un référentiel : recherche locale et suppression confirmée. */
-import { computed, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { getAdminResource } from '@/config/adminResources'
-import { getAdminItemDetails, getAdminItemTitle } from '@/config/adminForms'
-import { groupTechnicalSheets } from '@/utils/technicalSheets'
-import {
-  filterAdminItems,
-  getAdminListFilterConfig,
-  getAdminListFilterParams,
-  getAdminListFilterReferences,
-  getSpecialityFilterOptions,
-  getSurgeonFilterOptions,
-} from '@/services/adminFilters'
-import { useAdminStore } from '@/stores/admin'
-import { useReferenceStore } from '@/stores/references'
+/** Vue de liste administrative : son script ne relie que l'affichage au composable dédié. */
+import { useAdminListView } from '@/composables/useAdminListView'
 import PageContainer from '@/components/ui/PageContainer.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
+import PageHeading from '@/components/ui/PageHeading.vue'
+import AdminItemActions from '@/components/AdminItemActions.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorMessage from '@/components/ui/ErrorMessage.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
+import ConfirmationModal from '@/components/ui/ConfirmationModal.vue'
 
 const props = defineProps({
   resourceSlug: { type: String, required: true },
 })
 
-const adminStore = useAdminStore()
-const referenceStore = useReferenceStore()
-const { items, loading, deletingId, error } = storeToRefs(adminStore)
 const {
-  collections: referenceCollections,
-  loading: referencesLoading,
-  error: referencesError,
-} = storeToRefs(referenceStore)
-const search = ref('')
-const specialityFilter = ref('')
-const surgeonFilter = ref('')
-
-const resource = computed(() => getAdminResource(props.resourceSlug))
-const isTechnicalSheetList = computed(() => props.resourceSlug === 'fiches-techniques')
-const filterConfig = computed(() => getAdminListFilterConfig(props.resourceSlug))
-const hasSpecialityFilter = computed(() => Boolean(filterConfig.value.speciality))
-const hasSurgeonFilter = computed(() => Boolean(filterConfig.value.surgeon))
-const hasAdminFilters = computed(() => hasSpecialityFilter.value || hasSurgeonFilter.value)
-const displayedError = computed(() =>
-  resource.value
-    ? error.value || (hasAdminFilters.value ? referencesError.value : '')
-    : 'Ce référentiel n’existe pas.',
-)
-const pageLoading = computed(() =>
-  loading.value || (hasAdminFilters.value && referencesLoading.value),
-)
-const filteredItems = computed(() => {
-  const needle = search.value.trim().toLocaleLowerCase('fr')
-  const searchedItems = !needle ? items.value : items.value.filter((item) =>
-    JSON.stringify(item).toLocaleLowerCase('fr').includes(needle),
-  )
-  return filterAdminItems(searchedItems, {
-    specialityId: specialityFilter.value,
-    surgeonId: surgeonFilter.value,
-  })
-})
-const specialityOptions = computed(() => getSpecialityFilterOptions(
-  referenceCollections.value.specialites ?? [],
-))
-const surgeonOptions = computed(() => getSurgeonFilterOptions(
-  referenceCollections.value.chirurgiens ?? [],
-))
-const technicalSheetGroups = computed(() =>
-  groupTechnicalSheets(filteredItems.value),
-)
-const hasDisplayedItems = computed(() =>
-  isTechnicalSheetList.value ? technicalSheetGroups.value.length > 0 : filteredItems.value.length > 0,
-)
-
-/** Demande confirmation puis délègue la suppression, protégée côté API, au store. */
-async function remove(item) {
-  if (!window.confirm(`Supprimer « ${getAdminItemTitle(item)} » ?`)) return
-  await adminStore.removeItem(props.resourceSlug, item.id)
-}
-
-watch(
-  () => props.resourceSlug,
-  (resourceSlug) => {
-    search.value = ''
-    specialityFilter.value = ''
-    surgeonFilter.value = ''
-    if (!resource.value) return
-
-    adminStore.loadItems(resourceSlug)
-    const filterReferences = getAdminListFilterReferences(resourceSlug)
-    if (filterReferences.length) {
-      referenceStore.load(filterReferences, { force: true }).catch(() => {})
-    }
-  },
-  { immediate: true },
-)
-
-watch([specialityFilter, surgeonFilter], ([specialityId, surgeonId]) => {
-  if (!filterConfig.value.serverSide) return
-  adminStore.loadItems(props.resourceSlug, getAdminListFilterParams(props.resourceSlug, {
-    specialityId,
-    surgeonId,
-  }))
-})
+  deletingId,
+  displayedError,
+  filteredItems,
+  getAdminItemDetails,
+  getAdminItemTitle,
+  hasDisplayedItems,
+  hasSpecialityFilter,
+  hasSurgeonFilter,
+  isTechnicalSheetList,
+  pageLoading,
+  pendingRemoval,
+  requestRemoval,
+  cancelRemoval,
+  confirmRemoval,
+  resource,
+  search,
+  specialityFilter,
+  specialityOptions,
+  surgeonFilter,
+  surgeonOptions,
+  technicalSheetGroups,
+} = useAdminListView(props)
 </script>
 
 <template>
   <PageContainer>
-    <header class="page-heading">
-      <div>
-        <p class="page-eyebrow">Administration</p>
-        <p class="page-title">{{ resource?.label ?? 'Référentiel' }}</p>
-        <p class="page-description">{{ resource?.description }}</p>
-      </div>
-      <RouterLink
-        v-if="resource"
-        :to="{ name: 'admin-new', params: { resource: resourceSlug } }"
-        class="primary-link"
-      >
-        + Ajouter dans {{ resource.label }}
-      </RouterLink>
-    </header>
+    <PageHeading
+      eyebrow="Administration"
+      :title="resource?.label ?? 'Référentiel'"
+      :description="resource?.description"
+    >
+      <template #action>
+        <RouterLink
+          v-if="resource"
+          :to="{ name: 'admin-new', params: { resource: resourceSlug } }"
+          class="primary-link"
+        >
+          + Ajouter dans {{ resource.label }}
+        </RouterLink>
+      </template>
+    </PageHeading>
 
     <div v-if="resource" class="grid max-w-6xl gap-4 md:grid-cols-2 lg:grid-cols-3">
       <BaseInput
@@ -181,24 +114,13 @@ watch([specialityFilter, surgeonFilter], ([specialityId, surgeonId]) => {
               </p>
               <h4 class="item-title mt-1">{{ getAdminItemTitle(item) }}</h4>
               <p class="text-muted mt-1 line-clamp-2">{{ getAdminItemDetails(item) }}</p>
-              <div class="admin-item-actions">
-                <RouterLink
-                  :to="{ name: 'admin-edit', params: { resource: resourceSlug, id: item.id } }"
-                  :aria-label="`Modifier ${getAdminItemTitle(item)}`"
-                  class="secondary-link"
-                >
-                  Modifier
-                </RouterLink>
-                <BaseButton
-                  variant="danger"
-                  size="sm"
-                  :loading="deletingId === item.id"
-                  :aria-label="`Supprimer ${getAdminItemTitle(item)}`"
-                  @click="remove(item)"
-                >
-                  Supprimer
-                </BaseButton>
-              </div>
+              <AdminItemActions
+                :resource-slug="resourceSlug"
+                :item="item"
+                :title="getAdminItemTitle(item)"
+                :deleting="deletingId === item.id"
+                @remove="requestRemoval(item)"
+              />
             </article>
           </li>
         </ul>
@@ -224,24 +146,14 @@ watch([specialityFilter, surgeonFilter], ([specialityId, surgeonId]) => {
                   {{ getAdminItemDetails(item) }}
                 </td>
                 <td class="admin-table-cell">
-                  <div class="admin-item-actions justify-end">
-                    <RouterLink
-                      :to="{ name: 'admin-edit', params: { resource: resourceSlug, id: item.id } }"
-                      :aria-label="`Modifier ${getAdminItemTitle(item)}`"
-                      class="secondary-link"
-                    >
-                      Modifier
-                    </RouterLink>
-                    <BaseButton
-                      variant="danger"
-                      size="sm"
-                      :loading="deletingId === item.id"
-                      :aria-label="`Supprimer ${getAdminItemTitle(item)}`"
-                      @click="remove(item)"
-                    >
-                      Supprimer
-                    </BaseButton>
-                  </div>
+                  <AdminItemActions
+                    :resource-slug="resourceSlug"
+                    :item="item"
+                    :title="getAdminItemTitle(item)"
+                    :deleting="deletingId === item.id"
+                    align-end
+                    @remove="requestRemoval(item)"
+                  />
                 </td>
               </tr>
             </tbody>
@@ -257,27 +169,13 @@ watch([specialityFilter, surgeonFilter], ([specialityId, surgeonId]) => {
           <article class="admin-mobile-card">
             <h3 class="item-title">{{ getAdminItemTitle(item) }}</h3>
             <p class="text-muted mt-1 line-clamp-2">{{ getAdminItemDetails(item) }}</p>
-            <div class="admin-item-actions">
-              <RouterLink
-                :to="{
-                  name: 'admin-edit',
-                  params: { resource: resourceSlug, id: item.id },
-                }"
-                :aria-label="`Modifier ${getAdminItemTitle(item)}`"
-                class="secondary-link"
-              >
-                Modifier
-              </RouterLink>
-              <BaseButton
-                variant="danger"
-                size="sm"
-                :loading="deletingId === item.id"
-                :aria-label="`Supprimer ${getAdminItemTitle(item)}`"
-                @click="remove(item)"
-              >
-                Supprimer
-              </BaseButton>
-            </div>
+            <AdminItemActions
+              :resource-slug="resourceSlug"
+              :item="item"
+              :title="getAdminItemTitle(item)"
+              :deleting="deletingId === item.id"
+              @remove="requestRemoval(item)"
+            />
           </article>
         </li>
       </ul>
@@ -301,32 +199,30 @@ watch([specialityFilter, surgeonFilter], ([specialityId, surgeonId]) => {
                 {{ getAdminItemDetails(item) }}
               </td>
               <td class="admin-table-cell">
-                <div class="admin-item-actions justify-end">
-                  <RouterLink
-                    :to="{
-                      name: 'admin-edit',
-                      params: { resource: resourceSlug, id: item.id },
-                    }"
-                    :aria-label="`Modifier ${getAdminItemTitle(item)}`"
-                    class="secondary-link"
-                  >
-                    Modifier
-                  </RouterLink>
-                  <BaseButton
-                    variant="danger"
-                    size="sm"
-                    :loading="deletingId === item.id"
-                    :aria-label="`Supprimer ${getAdminItemTitle(item)}`"
-                    @click="remove(item)"
-                  >
-                    Supprimer
-                  </BaseButton>
-                </div>
+                <AdminItemActions
+                  :resource-slug="resourceSlug"
+                  :item="item"
+                  :title="getAdminItemTitle(item)"
+                  :deleting="deletingId === item.id"
+                  align-end
+                  @remove="requestRemoval(item)"
+                />
               </td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
+
+    <ConfirmationModal
+      :open="Boolean(pendingRemoval)"
+      variant="danger"
+      title="Confirmer la suppression"
+      :message="`Voulez-vous vraiment supprimer « ${pendingRemoval ? getAdminItemTitle(pendingRemoval) : ''} » ? Cette action est irréversible.`"
+      confirm-label="Supprimer"
+      :loading="deletingId === pendingRemoval?.id"
+      @cancel="cancelRemoval"
+      @confirm="confirmRemoval"
+    />
   </PageContainer>
 </template>

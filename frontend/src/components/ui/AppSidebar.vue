@@ -1,17 +1,9 @@
 <script setup>
-/** Navigation principale bureau, dont les liens d'administration dépendent du rôle courant. */
-import { computed } from 'vue'
+/** Navigation principale bureau alimentée par la configuration partagée. */
 import { RouterLink } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { useAppNavigation } from '@/composables/useAppNavigation'
 
-const authStore = useAuthStore()
-
-const links = computed(() => [
-  { label: 'Programme', to: '/programme', symbol: 'P' },
-  { label: 'Planifier un programme', to: '/planifier', symbol: '+' },
-  ...(authStore.isAdmin ? [{ label: 'Administration', to: '/admin', symbol: 'A' }] : []),
-  { label: 'Compte', to: '/compte', symbol: 'C' },
-])
+const { links } = useAppNavigation()
 </script>
 
 <template>

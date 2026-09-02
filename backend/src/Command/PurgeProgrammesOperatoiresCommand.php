@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Repository\ChirurgiePlanifieeRepository;
+use Psr\Clock\ClockInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -15,14 +16,18 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class PurgeProgrammesOperatoiresCommand extends Command
 {
-    public function __construct(private readonly ChirurgiePlanifieeRepository $repository)
-    {
+    public function __construct(
+        private readonly ChirurgiePlanifieeRepository $repository,
+        private readonly ClockInterface $clock,
+    ) {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $dateLimite = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Paris'));
+        $dateLimite = \DateTimeImmutable::createFromInterface($this->clock->now())
+            ->setTimezone(new \DateTimeZone('Europe/Paris'))
+            ->setTime(0, 0);
         $nombreChirurgies = $this->repository->deleteProgrammesBefore($dateLimite);
 
         (new SymfonyStyle($input, $output))->success(sprintf(

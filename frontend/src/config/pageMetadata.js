@@ -21,7 +21,7 @@ const defaultDescription =
   'ChirOrg : planification des programmes opératoires et préparation du matériel chirurgical.'
 
 /** Produit le titre métier d'une route, y compris pour les référentiels paramétrés. */
-export function resolvePageTitle(route) {
+function resolvePageTitle(route) {
   const resourceLabel = getAdminResourceLabel(route.params.resource)
 
   if (route.name === 'admin-list') return resourceLabel

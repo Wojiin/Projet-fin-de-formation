@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  groupTechnicalSheets,
-} from '@/utils/technicalSheets'
-import { getSpecialityFilterOptions } from '@/services/adminFilters'
+import { groupTechnicalSheets } from '@/utils/technicalSheets'
+import { getSpecialityFilterOptions } from '@/domain/adminFilters'
 
 const sheets = [
   {

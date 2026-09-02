@@ -5,17 +5,15 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\ChirurgiePlanifiee;
-use App\Entity\User;
+use App\Service\AuthenticatedUserProvider;
 use App\Service\ChirurgieValidationService;
-use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /** Délègue la validation d'une chirurgie au service après identification de l'utilisateur connecté. */
 final readonly class ChirurgieValidationProcessor implements ProcessorInterface
 {
     public function __construct(
         private ChirurgieValidationService $validationService,
-        private Security $security,
+        private AuthenticatedUserProvider $authenticatedUser,
     ) {
     }
 
@@ -26,12 +24,6 @@ final readonly class ChirurgieValidationProcessor implements ProcessorInterface
             throw new \InvalidArgumentException('Une chirurgie planifiée est attendue.');
         }
 
-        $user = $this->security->getUser();
-
-        if (!$user instanceof User) {
-            throw new AccessDeniedHttpException('Utilisateur non authentifié.');
-        }
-
-        return $this->validationService->validate($data, $user);
+        return $this->validationService->validate($data, $this->authenticatedUser->getUser());
     }
 }

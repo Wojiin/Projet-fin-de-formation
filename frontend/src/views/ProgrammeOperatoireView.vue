@@ -1,9 +1,8 @@
 <script setup>
-/** Vue liste des programmes : gère uniquement les filtres d'interface et leur chargement. */
-import { onMounted, reactive, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useProgrammeStore } from '@/stores/programme'
+/** Vue liste des programmes : son script ne relie que l'affichage au composable dédié. */
+import { useProgrammeOperatoireView } from '@/composables/useProgrammeOperatoireView'
 import PageContainer from '@/components/ui/PageContainer.vue'
+import PageHeading from '@/components/ui/PageHeading.vue'
 import ProgrammeSummaryCard from '@/components/ProgrammeSummaryCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -12,46 +11,30 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorMessage from '@/components/ui/ErrorMessage.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 
-const programmeStore = useProgrammeStore()
 const {
-  filters: storedFilters,
-  rooms,
-  filteredProgrammes,
-  loading,
+  clearFilters,
   error,
-} = storeToRefs(programmeStore)
-
-const filters = reactive({ ...storedFilters.value })
-
-/** Recharge la liste en appliquant l'état local des filtres facultatifs. */
-function loadProgrammes() {
-  return programmeStore.fetchProgrammes({ ...filters })
-}
-
-/** Réinitialise les deux filtres et déclenche le rechargement via le watcher. */
-function clearFilters() {
-  filters.date = ''
-  filters.room = ''
-}
-
-onMounted(loadProgrammes)
-watch(filters, loadProgrammes)
+  filteredProgrammes,
+  filters,
+  loading,
+  loadProgrammes,
+  rooms,
+} = useProgrammeOperatoireView()
 </script>
 
 <template>
   <PageContainer>
-    <header class="page-heading">
-      <div>
-        <p class="page-eyebrow">Vue d’ensemble</p>
-        <p class="page-title">Programme opératoire</p>
-        <p class="page-description">
-          Retrouvez les programmes par chirurgien, date et salle.
-        </p>
-      </div>
-      <RouterLink :to="{ name: 'planification' }" class="primary-link">
-        + Planifier un programme
-      </RouterLink>
-    </header>
+    <PageHeading
+      eyebrow="Vue d’ensemble"
+      title="Programme opératoire"
+      description="Retrouvez les programmes par chirurgien, date et salle."
+    >
+      <template #action>
+        <RouterLink :to="{ name: 'planification' }" class="primary-link">
+          + Planifier un programme
+        </RouterLink>
+      </template>
+    </PageHeading>
 
     <form
       aria-label="Filtrer les programmes"

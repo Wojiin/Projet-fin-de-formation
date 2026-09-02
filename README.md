@@ -24,6 +24,18 @@ Dans le frontend, les conventions suivent celles de Netflux :
 
 Les classes du domaine médical conservent leur nomenclature française afin de rester alignées avec le vocabulaire fonctionnel de ChirOrg.
 
+Dans le backend, les responsabilités sont organisées ainsi :
+
+- `src/Controller` et `src/State` sont des adaptateurs minces pour HTTP et API Platform ;
+- `src/Service` porte les cas d’usage, règles métier, projections de lecture et intégrations techniques ;
+- `src/Repository` centralise exclusivement les requêtes Doctrine ;
+- `src/Dto` définit les commandes, références et contrats de sortie ;
+- l’accès à l’utilisateur courant, la traçabilité, les mots de passe et le stockage des images passent par des services dédiés.
+
+Les tests d’architecture empêchent notamment de réintroduire la sécurité ou le mapping des réponses dans les processors/providers, ainsi que les opérations de fichiers dans les contrôleurs.
+
+Le détail des constats et des choix est conservé dans [`docs/architecture-backend.md`](docs/architecture-backend.md).
+
 ## Lancement avec Docker
 
 Prérequis : Docker et Docker Compose.
@@ -60,6 +72,7 @@ npm run dev
 ```bash
 cd backend
 php bin/phpunit
+composer check
 
 cd ../frontend
 npm run test:unit

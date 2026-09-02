@@ -13,8 +13,10 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final readonly class ChirurgieValidationService
 {
-    public function __construct(private EntityManagerInterface $entityManager)
-    {
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+        private ChirurgieAuditTrail $auditTrail,
+    ) {
     }
 
     /**
@@ -39,11 +41,9 @@ final readonly class ChirurgieValidationService
             $hasAbsent = $hasAbsent || $preparation->isAbsent();
         }
 
-        $now = new \DateTimeImmutable();
+        $now = $this->auditTrail->now();
         if ($hasAbsent) {
-            $chirurgie
-                ->setModifieLe($now)
-                ->setModifiePar($user->getUserIdentifier());
+            $this->auditTrail->markModified($chirurgie, $user->getUserIdentifier(), $now);
             $this->entityManager->flush();
 
             return $chirurgie;
@@ -52,9 +52,8 @@ final readonly class ChirurgieValidationService
         $chirurgie
             ->setValide(true)
             ->setValideLe($now)
-            ->setValidePar($user)
-            ->setModifieLe($now)
-            ->setModifiePar($user->getUserIdentifier());
+            ->setValidePar($user);
+        $this->auditTrail->markModified($chirurgie, $user->getUserIdentifier(), $now);
 
         $this->entityManager->flush();
 

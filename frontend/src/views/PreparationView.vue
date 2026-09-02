@@ -1,9 +1,6 @@
 <script setup>
-/** Vue de checklist : affiche la préparation, contrôle sa progression et déclenche sa validation. */
-import { computed, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
-import { usePreparationStore } from '@/stores/preparation'
+/** Vue de préparation : son script ne relie que l'affichage au composable dédié. */
+import { usePreparationView } from '@/composables/usePreparationView'
 import PageContainer from '@/components/ui/PageContainer.vue'
 import PreparationItem from '@/components/PreparationItem.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -16,49 +13,19 @@ const props = defineProps({
   id: { type: Number, required: true },
 })
 
-const router = useRouter()
-const preparationStore = usePreparationStore()
 const {
-  preparation,
-  loading,
-  savingId,
   error,
-  isComplete,
-  isResolved,
+  goBack,
   isPartial,
-} = storeToRefs(preparationStore)
-
-const surgery = computed(() => preparation.value?.chirurgie)
-const progress = computed(
-  () => preparation.value?.progressionPreparation ?? { total: 0, coches: 0 },
-)
-
-watch(
-  () => props.id,
-  async (id) => {
-    const loaded = await preparationStore.loadPreparation(id)
-    if (loaded?.chirurgie.valide) {
-      await router.replace({ name: 'vue-finale', params: { id } })
-    } else if (loaded?.chirurgie.etatValidation === 'VALIDATION_PARTIELLE') {
-      await router.replace({ name: 'validation-partielle', params: { id } })
-    }
-  },
-  { immediate: true },
-)
-
-/** Valide la chirurgie ou la laisse modifiable si du matériel demeure absent. */
-async function validate() {
-  const result = await preparationStore.validateSurgery()
-  if (result === 'final') {
-    await router.push({ name: 'vue-finale', params: { id: surgery.value.id } })
-  } else if (result === 'partial') {
-    await router.push({ name: 'validation-partielle', params: { id: surgery.value.id } })
-  }
-}
-
-async function setMaterialState(item, state) {
-  await preparationStore.setMaterialState(item, state)
-}
+  isResolved,
+  loading,
+  preparation,
+  progress,
+  savingId,
+  setMaterialState,
+  surgery,
+  validate,
+} = usePreparationView(props)
 </script>
 
 <template>
@@ -118,15 +85,20 @@ async function setMaterialState(item, state) {
           <p v-else-if="!isResolved" class="feedback-error-soft mt-4">
             Tout le matériel doit être déclaré prêt ou absent avant de valider.
           </p>
-          <BaseButton
-            class="mt-5 w-full"
-            size="lg"
-            :disabled="!isResolved || surgery.valide || isPartial"
-            :loading="loading"
-            @click="validate"
-          >
-            {{ surgery.valide ? 'Chirurgie validée' : isPartial ? 'Validation partielle' : 'Valider la chirurgie' }}
-          </BaseButton>
+          <div class="mt-5 flex flex-col gap-3">
+            <BaseButton
+              class="w-full"
+              size="lg"
+              :disabled="!isResolved || surgery.valide || isPartial"
+              :loading="loading"
+              @click="validate"
+            >
+              {{ surgery.valide ? 'Chirurgie validée' : isPartial ? 'Validation partielle' : 'Valider la chirurgie' }}
+            </BaseButton>
+            <BaseButton class="w-full" size="lg" variant="secondary" @click="goBack">
+              Retour
+            </BaseButton>
+          </div>
         </aside>
       </div>
     </template>

@@ -5,13 +5,12 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\ChirurgiePlanifiee;
-use App\Entity\User;
+use App\Service\AuthenticatedUserProvider;
+use App\Service\ChirurgieAuditTrail;
 use App\Service\PreparationMaterielInitializer;
 use App\Service\ProgrammeOrderAllocator;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Encadre l'écriture d'une chirurgie planifiée : calcule sa position initiale
@@ -25,7 +24,8 @@ final readonly class ChirurgiePlanifieeWriteProcessor implements ProcessorInterf
         private PreparationMaterielInitializer $initializer,
         private ProgrammeOrderAllocator $orderAllocator,
         private EntityManagerInterface $entityManager,
-        private Security $security,
+        private AuthenticatedUserProvider $authenticatedUser,
+        private ChirurgieAuditTrail $auditTrail,
     ) {
     }
 
@@ -39,22 +39,13 @@ final readonly class ChirurgiePlanifieeWriteProcessor implements ProcessorInterf
             throw new \InvalidArgumentException('Une chirurgie planifiée est attendue.');
         }
 
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
-            throw new AccessDeniedHttpException('Utilisateur non authentifié.');
-        }
-
+        $user = $this->authenticatedUser->getUser();
         $isNew = null === $data->getId();
-        $now = new \DateTimeImmutable();
         $identifier = $user->getUserIdentifier();
         if ($isNew) {
-            $data
-                ->setCreeLe($now)
-                ->setCreePar($identifier)
-                ->setModifieLe($now)
-                ->setModifiePar($identifier);
+            $this->auditTrail->markCreated($data, $identifier);
         } else {
-            $data->setModifieLe($now)->setModifiePar($identifier);
+            $this->auditTrail->markModified($data, $identifier);
         }
 
         if (!$isNew) {

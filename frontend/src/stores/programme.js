@@ -1,54 +1,10 @@
 import { defineStore } from 'pinia'
 import { programmeApi } from '@/services/programmeApi'
-import { getApiErrorMessage, unwrapCollection } from '@/api/axios'
-
-/** Uniformise une chirurgie planifiée, quelle que soit la forme du payload API reçu. */
-export function normalizePlannedSurgery(data) {
-  return {
-    ...data,
-    date: data.dateProgrammee ?? data.date ?? '',
-    progressionPreparation: data.progressionPreparation ?? {
-      total: data.preparationsMateriel?.length ?? 0,
-      coches: data.preparationsMateriel?.filter((item) => item.coche).length ?? 0,
-      absents: data.preparationsMateriel?.filter((item) => item.absent).length ?? 0,
-      traites: data.preparationsMateriel?.filter((item) => item.coche || item.absent).length ?? 0,
-      complete:
-        Boolean(data.preparationsMateriel?.length) &&
-        data.preparationsMateriel.every((item) => item.coche || item.absent),
-    },
-  }
-}
-
-/** Uniformise le détail d'un programme et propage ses informations communes aux chirurgies. */
-export function normalizeProgramme(data) {
-  return {
-    ...data,
-    chirurgies: (data.chirurgies ?? []).map((chirurgie) =>
-      normalizePlannedSurgery({
-        ...chirurgie,
-        date: data.date,
-        salle: data.salle,
-        chirurgien: data.chirurgien,
-      }),
-    ),
-  }
-}
-
-/** Normalise la représentation légère utilisée par la liste des programmes. */
-export function normalizeProgrammeSummary(data) {
-  return {
-    ...data,
-    id: data.id ?? `${data.date}|${data.salle}|${data.chirurgien.id}`,
-    chirurgies: data.chirurgies ?? [],
-  }
-}
-
-/** Charge et normalise les résumés sans déclencher la lecture coûteuse des détails. */
-export async function loadProgrammeSummaries(params = {}, client = programmeApi) {
-  const response = await client.list(params)
-  const data = response?.data ?? response
-  return unwrapCollection(data).map(normalizeProgrammeSummary)
-}
+import { getApiErrorMessage } from '@/api/response'
+import {
+  normalizeProgramme,
+  normalizeProgrammeSummaries,
+} from '@/mappers/programme'
 
 /** Gère les programmes, les filtres locaux, la création et le réordonnancement persistant. */
 export const useProgrammeStore = defineStore('programme', {
@@ -59,13 +15,17 @@ export const useProgrammeStore = defineStore('programme', {
       date: '',
       room: '',
     },
-    loading: false,
+    pendingLoads: 0,
+    listRequestId: 0,
+    detailRequestId: 0,
     planning: false,
+    deletingSurgeryId: null,
     savingProgrammeId: null,
     error: '',
   }),
 
   getters: {
+    loading: (state) => state.pendingLoads > 0,
     chirurgies: (state) => state.programmes.flatMap((programme) => programme.chirurgies),
     rooms: (state) => [...new Set(state.programmes.map((item) => item.salle))].sort(),
     filteredProgrammes: (state) =>
@@ -108,7 +68,8 @@ export const useProgrammeStore = defineStore('programme', {
     /** Charge la liste filtrée et expose toute erreur métier à l'interface. */
     async fetchProgrammes(filters = this.filters) {
       this.setFilters(filters)
-      this.loading = true
+      const requestId = ++this.listRequestId
+      this.pendingLoads += 1
       this.error = ''
 
       try {
@@ -116,31 +77,38 @@ export const useProgrammeStore = defineStore('programme', {
           ...(this.filters.date ? { date: this.filters.date } : {}),
           ...(this.filters.room ? { salle: this.filters.room } : {}),
         }
-        this.programmes = await loadProgrammeSummaries(params)
-        return this.programmes
+        const programmes = normalizeProgrammeSummaries(await programmeApi.list(params))
+        if (requestId === this.listRequestId) this.programmes = programmes
+        return programmes
       } catch (error) {
-        this.error = getApiErrorMessage(error, 'Impossible de charger le programme opératoire.')
+        if (requestId === this.listRequestId) {
+          this.error = getApiErrorMessage(error, 'Impossible de charger le programme opératoire.')
+        }
         return []
       } finally {
-        this.loading = false
+        this.pendingLoads -= 1
       }
     },
 
     /** Charge le détail d'un programme sélectionné pour sa consultation ou son réordonnancement. */
     async loadProgramme({ date, salle, chirurgien }) {
-      this.loading = true
+      const requestId = ++this.detailRequestId
+      this.pendingLoads += 1
       this.error = ''
       this.selectedProgramme = null
 
       try {
         const data = await programmeApi.getProgramme({ date, salle, chirurgien })
-        this.selectedProgramme = normalizeProgramme(data)
-        return this.selectedProgramme
+        const programme = normalizeProgramme(data)
+        if (requestId === this.detailRequestId) this.selectedProgramme = programme
+        return programme
       } catch (error) {
-        this.error = getApiErrorMessage(error, 'Impossible de charger le détail du programme.')
+        if (requestId === this.detailRequestId) {
+          this.error = getApiErrorMessage(error, 'Impossible de charger le détail du programme.')
+        }
         return null
       } finally {
-        this.loading = false
+        this.pendingLoads -= 1
       }
     },
 
@@ -191,6 +159,36 @@ export const useProgrammeStore = defineStore('programme', {
         return false
       } finally {
         this.savingProgrammeId = null
+      }
+    },
+
+    /** Supprime une chirurgie non validée puis synchronise les programmes déjà chargés. */
+    async deleteSurgery(programme, chirurgieId) {
+      this.deletingSurgeryId = chirurgieId
+      this.error = ''
+
+      try {
+        await programmeApi.deleteSurgery(chirurgieId)
+        programme.chirurgies = programme.chirurgies.filter(
+          (chirurgie) => String(chirurgie.id) !== String(chirurgieId),
+        )
+        programme.nombreChirurgies = programme.chirurgies.length
+        this.programmes = this.programmes
+          .map((item) => {
+            if (item.id !== programme.id) return item
+            return {
+              ...item,
+              chirurgies: programme.chirurgies,
+              nombreChirurgies: programme.chirurgies.length,
+            }
+          })
+          .filter((item) => item.chirurgies.length > 0)
+        return true
+      } catch (error) {
+        this.error = getApiErrorMessage(error, 'La chirurgie n’a pas pu être supprimée.')
+        return false
+      } finally {
+        this.deletingSurgeryId = null
       }
     },
   },

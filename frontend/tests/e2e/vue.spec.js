@@ -1,10 +1,14 @@
+import process from 'node:process'
 import { test, expect } from '@playwright/test'
+
+const e2eEmail = process.env.CHIRORG_E2E_EMAIL || 'admin@chirorg.test'
+const e2ePassword = process.env.CHIRORG_E2E_PASSWORD || 'password'
 
 async function login(page) {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Connexion' })).toBeVisible()
-  await page.getByLabel('Email').fill('admin@chirorg.test')
-  await page.getByLabel('Mot de passe').fill('password')
+  await page.getByLabel('Email').fill(e2eEmail)
+  await page.getByLabel('Mot de passe').fill(e2ePassword)
   await page.getByRole('button', { name: 'Se connecter' }).click()
   await expect(page.getByText('Programme opératoire', { exact: true }).first()).toBeVisible()
 }

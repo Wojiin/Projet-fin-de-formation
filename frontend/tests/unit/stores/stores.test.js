@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import {
-  loadProgrammeSummaries,
   normalizePlannedSurgery,
   normalizeProgramme,
-  useProgrammeStore,
-} from '@/stores/programme'
-import { normalizeFinalView, normalizePreparation, usePreparationStore } from '@/stores/preparation'
+  normalizeProgrammeSummaries,
+} from '@/mappers/programme'
+import { normalizeFinalView, normalizePreparation } from '@/mappers/preparation'
+import { useProgrammeStore } from '@/stores/programme'
+import { usePreparationStore } from '@/stores/preparation'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/services/authApi'
+import { accountApi } from '@/services/accountApi'
 import { preparationApi } from '@/services/preparationApi'
 import { programmeApi } from '@/services/programmeApi'
 import { configureApiAuth } from '@/api/axios'
@@ -77,7 +79,9 @@ describe('ChirOrg stores with API services', () => {
       },
     }
 
-    const programmes = await loadProgrammeSummaries({ date: '2030-01-15' }, api)
+    const programmes = normalizeProgrammeSummaries(
+      await api.list({ date: '2030-01-15' }),
+    )
 
     expect(programmes).toHaveLength(1)
     expect(programmes[0].id).toBe('2030-01-15|Salle Test|7')
@@ -103,10 +107,29 @@ describe('ChirOrg stores with API services', () => {
     expect(store.programmes.some((item) => item.id === 'temporary-programme')).toBe(false)
   })
 
+  it('ignores an obsolete programme response that finishes after a newer filter', async () => {
+    let resolveFirst
+    let resolveSecond
+    vi.spyOn(programmeApi, 'list')
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve }))
+    const store = useProgrammeStore()
+
+    const firstLoad = store.fetchProgrammes({ date: '2030-01-15', room: '' })
+    const secondLoad = store.fetchProgrammes({ date: '2030-01-16', room: '' })
+    resolveSecond([{ ...programmeSummary, id: 'new', date: '2030-01-16' }])
+    await secondLoad
+    resolveFirst([{ ...programmeSummary, id: 'old', date: '2030-01-15' }])
+    await firstLoad
+
+    expect(store.programmes.map((programme) => programme.id)).toEqual(['new'])
+    expect(store.loading).toBe(false)
+  })
+
   it('initializes authentication before protected navigation', async () => {
     const store = useAuthStore()
     store.setAccessToken('api-token')
-    vi.spyOn(authApi, 'me').mockResolvedValue({
+    vi.spyOn(accountApi, 'getCurrent').mockResolvedValue({
       id: 1,
       email: 'admin@chirorg.test',
       roles: ['ROLE_ADMIN', 'ROLE_USER'],
@@ -124,7 +147,7 @@ describe('ChirOrg stores with API services', () => {
       roles: ['ROLE_ADMIN', 'ROLE_USER'],
     })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
     const token = `header.${payload}.signature`
-    const meSpy = vi.spyOn(authApi, 'me')
+    const meSpy = vi.spyOn(accountApi, 'getCurrent')
     const store = useAuthStore()
     store.setAccessToken(token)
 
@@ -139,7 +162,7 @@ describe('ChirOrg stores with API services', () => {
   it('keeps the access token in Pinia memory without browser storage', async () => {
     const storageSpy = vi.spyOn(Storage.prototype, 'setItem')
     vi.spyOn(authApi, 'login').mockResolvedValue({ token: 'memory-only-token' })
-    vi.spyOn(authApi, 'me').mockResolvedValue({
+    vi.spyOn(accountApi, 'getCurrent').mockResolvedValue({
       id: 1,
       email: 'admin@chirorg.test',
       roles: ['ROLE_ADMIN', 'ROLE_USER'],
@@ -195,6 +218,27 @@ describe('ChirOrg stores with API services', () => {
     expect(await store.reorderProgramme(programme, [20, 10])).toBe(true)
     expect(programme.chirurgies.map((item) => item.id)).toEqual([20, 10])
     expect(programme.chirurgies.map((item) => item.ordre)).toEqual([1, 2])
+  })
+
+  it('deletes a planned surgery and updates the programme cache', async () => {
+    vi.spyOn(programmeApi, 'deleteSurgery').mockResolvedValue()
+    const store = useProgrammeStore()
+    const programme = normalizeProgramme({
+      id: '2026-07-24-Salle A-1',
+      date: '2026-07-24',
+      salle: 'Salle A',
+      chirurgien: { id: 1, prenom: 'Jean', nom: 'Dupont' },
+      chirurgies: [
+        { id: 10, ordre: 1, dateProgrammee: '2026-07-24' },
+        { id: 20, ordre: 2, dateProgrammee: '2026-07-24' },
+      ],
+    })
+    store.programmes = [programme]
+
+    expect(await store.deleteSurgery(programme, 10)).toBe(true)
+    expect(programme.chirurgies.map((item) => item.id)).toEqual([20])
+    expect(store.programmes[0].chirurgies.map((item) => item.id)).toEqual([20])
+    expect(store.deletingSurgeryId).toBeNull()
   })
 
   it('loads the selected programme detail', async () => {

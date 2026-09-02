@@ -237,6 +237,16 @@ final class ApiWorkflowTest extends ApiTestCase
             self::assertSame('user@chirorg.test', $chirurgie['modifiePar']);
             self::assertNotEmpty($chirurgie['modifieLe']);
         }
+
+        $client->request('DELETE', '/api/chirurgies-planifiees/'.$idsInverses[0], ['headers' => $headers]);
+        self::assertResponseStatusCodeSame(204);
+        self::assertNull($this->chirurgieRepository()->find($idsInverses[0]));
+
+        $chirurgieValidee = $this->chirurgieRepository()->findOneBy(['valide' => true]);
+        self::assertInstanceOf(ChirurgiePlanifiee::class, $chirurgieValidee);
+        $client->request('DELETE', '/api/chirurgies-planifiees/'.$chirurgieValidee->getId(), ['headers' => $headers]);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('RESOURCE_ALREADY_USED', $client->getResponse()->toArray(false)['errorCode']);
     }
 
     public function testPreparationAndValidationWorkflow(): void

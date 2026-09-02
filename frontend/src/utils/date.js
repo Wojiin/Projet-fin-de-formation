@@ -4,7 +4,7 @@ function pad(value) {
 }
 
 /** Convertit une date locale en valeur compatible avec un champ input[type=date]. */
-export function toDateInputValue(date) {
+function toDateInputValue(date) {
   return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-')
 }
 

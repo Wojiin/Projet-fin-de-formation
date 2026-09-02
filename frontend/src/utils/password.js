@@ -1,5 +1,5 @@
 export const PASSWORD_PATTERN_SOURCE = String.raw`(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d])\S{12,128}`
-export const PASSWORD_PATTERN = new RegExp(`^${PASSWORD_PATTERN_SOURCE}$`)
+const PASSWORD_PATTERN = new RegExp(`^${PASSWORD_PATTERN_SOURCE}$`)
 export const PASSWORD_REQUIREMENTS =
   '12 caractères minimum, avec au moins une minuscule, une majuscule, un chiffre et un caractère spécial, sans espace.'
 

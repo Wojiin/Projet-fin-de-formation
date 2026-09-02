@@ -5,15 +5,31 @@ Application monopage Vue 3 de planification et de préparation des programmes op
 ## Architecture
 
 - `src/router` : routes nommées, layout authentifié imbriqué et gardes de navigation ;
-- `src/api` : client Axios commun et gestion du renouvellement de session ;
-- `src/services` : appels métier et adaptation des réponses API ;
-- `src/stores` : état global et logique métier Pinia ;
-- `src/views` : orchestration des écrans à partir des props de route et des stores ;
+- `src/api` : configuration HTTP, client Axios, erreurs et formats de réponse ;
+- `src/services` : appels réseau sans état réactif ni logique d’affichage ;
+- `src/mappers` : adaptation des payloads API vers les modèles du frontend ;
+- `src/stores` : état métier partagé et mutations Pinia ;
+- `src/composables` : orchestration fonctionnelle des vues, du routeur et des stores ;
+- `src/views` : assemblage déclaratif des composants et logique d’affichage uniquement ;
 - `src/components` : composants de présentation et champs de formulaire réutilisables ;
-- `src/config` : description des référentiels et des formulaires d’administration ;
+- `src/config` : descriptions déclaratives des écrans, formulaires et navigations ;
+- `src/domain` : règles métier pures, comme les filtres administratifs ;
+- `src/presenters` : libellés et textes dérivés destinés à l’affichage ;
 - `src/utils` : fonctions pures partagées.
 
-Les vues n’appellent pas Axios directement. Les services renvoient les données utiles, puis les actions Pinia mettent à jour l’état réactif.
+Chaque vue fonctionnelle possède un composable `use<NomDeLaVue>.js`. Les vues ne dépendent directement ni d’Axios, ni des services, ni de Pinia, ni du routeur. Les services HTTP renvoient les données utiles, les mappers les adaptent, puis les actions Pinia mettent à jour l’état partagé. Des tests d’architecture verrouillent ces frontières.
+
+```text
+Vue.vue → useVue.js → store Pinia → service API → client Axios
+                         ↓
+                       mapper
+```
+
+Une vue peut appeler un service depuis son composable lorsqu’une commande ne produit aucun état partagé, par exemple le changement de mot de passe ou le téléversement temporaire d’une image.
+
+Les services restent ciblés par domaine : `authApi` gère le cycle de session, `accountApi` le compte courant, `technicalSheetApi` les fiches techniques, `programmeApi` les programmes et `preparationApi` la checklist. Le CRUD générique des référentiels reste isolé dans `adminApi`.
+
+Les structures visuelles répétées sont également mutualisées : `PageHeading` porte les en-têtes et leurs actions, `SurgeryOverview` le résumé commun aux validations, et `AdminItemActions` les commandes CRUD des listes responsive.
 
 ## Authentification
 

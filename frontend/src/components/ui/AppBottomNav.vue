@@ -1,16 +1,9 @@
 <script setup>
-/** Variante mobile de la navigation principale, construite à partir des droits de session. */
-import { computed } from 'vue'
+/** Variante mobile de la navigation principale alimentée par la configuration partagée. */
 import { RouterLink } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { useAppNavigation } from '@/composables/useAppNavigation'
 
-const authStore = useAuthStore()
-const links = computed(() => [
-  { label: 'Programme', shortLabel: 'Programme', to: '/programme', symbol: 'P' },
-  { label: 'Planifier un programme', shortLabel: 'Planifier', to: '/planifier', symbol: '+' },
-  ...(authStore.isAdmin ? [{ label: 'Administration', shortLabel: 'Admin', to: '/admin', symbol: 'A' }] : []),
-  { label: 'Compte', shortLabel: 'Compte', to: '/compte', symbol: 'C' },
-])
+const { links } = useAppNavigation()
 </script>
 
 <template>

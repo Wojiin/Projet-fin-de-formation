@@ -1,145 +1,37 @@
 <script setup>
-/** Vue de création d'un programme multi-chirurgies avec ordre initial et date minimale. */
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
-import { getTomorrowDateValue } from '@/utils/date'
-import { useProgrammeStore } from '@/stores/programme'
-import { useReferenceStore } from '@/stores/references'
+/** Vue de planification : son script ne relie que l'affichage au composable dédié. */
+import { usePlanificationView } from '@/composables/usePlanificationView'
 import PageContainer from '@/components/ui/PageContainer.vue'
+import PageHeading from '@/components/ui/PageHeading.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import ErrorMessage from '@/components/ui/ErrorMessage.vue'
 
-const router = useRouter()
-const programmeStore = useProgrammeStore()
-const referenceStore = useReferenceStore()
-const { planning, error: programmeError } = storeToRefs(programmeStore)
-const { loading: referencesLoading, error: referenceError } = storeToRefs(referenceStore)
-
-const minimumDate = getTomorrowDateValue()
-const formError = ref('')
-const form = reactive({
-  specialiteId: '',
-  chirurgienId: '',
-  dateProgrammee: minimumDate,
-  salle: 'Salle A',
-  chirurgieModeleIds: [''],
-})
-
-const rooms = ['Salle A', 'Salle B', 'Salle C']
-const specialties = computed(() =>
-  referenceStore
-    .getCollection('specialites')
-    .map((item) => ({ value: item.id, label: item.intitule }))
-    .sort((left, right) => left.label.localeCompare(right.label, 'fr')),
-)
-const surgeons = computed(() =>
-  referenceStore
-    .getCollection('chirurgiens')
-    .filter((item) => String(item.specialite?.id) === String(form.specialiteId))
-    .map((item) => ({
-      value: item.id,
-      label: `Dr ${item.prenom} ${item.nom}`,
-    }))
-    .sort((left, right) => left.label.localeCompare(right.label, 'fr')),
-)
-const surgeries = computed(() =>
-  referenceStore
-    .getCollection('chirurgie-modeles')
-    .filter((item) => String(item.specialite?.id) === String(form.specialiteId))
-    .map((item) => ({
-      value: item.id,
-      label: item.intitule,
-    }))
-    .sort((left, right) => left.label.localeCompare(right.label, 'fr')),
-)
-const displayedError = computed(
-  () => formError.value || programmeError.value || referenceError.value,
-)
-
-/** Ajoute une position de chirurgie à la fin de l'ordre initial. */
-function addSurgery() {
-  form.chirurgieModeleIds.push('')
-}
-
-/** Retire une position sans permettre de vider entièrement le programme. */
-function removeSurgery(index) {
-  if (form.chirurgieModeleIds.length > 1) {
-    form.chirurgieModeleIds.splice(index, 1)
-  }
-}
-
-/** Efface les choix dépendants lorsqu'une autre spécialité est sélectionnée. */
-watch(
-  () => form.specialiteId,
-  () => {
-    form.chirurgienId = ''
-    form.chirurgieModeleIds = ['']
-  },
-)
-
-onMounted(async () => {
-  try {
-    await referenceStore.load(['specialites', 'chirurgiens', 'chirurgie-modeles'])
-  } catch {
-    // Le store expose le message d'erreur à la vue.
-  }
-})
-
-/** Valide le formulaire local puis délègue la création atomique au store de programme. */
-async function submit() {
-  formError.value = ''
-  const surgeryModelIds = form.chirurgieModeleIds.map(Number)
-
-  if (
-    !form.specialiteId ||
-    !form.chirurgienId ||
-    !form.dateProgrammee ||
-    !form.salle ||
-    surgeryModelIds.some((id) => !Number.isInteger(id) || id <= 0)
-  ) {
-    formError.value =
-      'La spécialité, le chirurgien, la date, la salle et chaque modèle de chirurgie sont obligatoires.'
-    return
-  }
-  if (
-    !surgeons.value.some((item) => Number(item.value) === Number(form.chirurgienId)) ||
-    surgeryModelIds.some(
-      (id) => !surgeries.value.some((item) => Number(item.value) === id),
-    )
-  ) {
-    formError.value = 'Le chirurgien et les chirurgies doivent correspondre à la spécialité sélectionnée.'
-    return
-  }
-  if (form.dateProgrammee < minimumDate) {
-    formError.value = 'La date du programme doit être au minimum celle de demain.'
-    return
-  }
-
-  const createdProgramme = await programmeStore.planProgramme({
-    chirurgienId: Number(form.chirurgienId),
-    chirurgieModeleIds: surgeryModelIds,
-    dateProgrammee: form.dateProgrammee,
-    salle: form.salle,
-  })
-
-  if (createdProgramme) {
-    await router.push({ name: 'programme' })
-  }
-}
+const {
+  addSurgery,
+  cancel,
+  displayedError,
+  form,
+  minimumDate,
+  planning,
+  referencesLoading,
+  removeSurgery,
+  rooms,
+  specialties,
+  submit,
+  surgeons,
+  surgeries,
+} = usePlanificationView()
 </script>
 
 <template>
   <PageContainer>
-    <header>
-      <p class="page-eyebrow">Programme opératoire</p>
-      <p class="page-title">Planifier un programme</p>
-      <p class="page-description">
-        Choisissez une spécialité pour filtrer le chirurgien et les interventions, puis définissez leur ordre initial.
-      </p>
-    </header>
+    <PageHeading
+      eyebrow="Programme opératoire"
+      title="Planifier un programme"
+      description="Choisissez une spécialité pour filtrer le chirurgien et les interventions, puis définissez leur ordre initial."
+    />
 
     <form class="form-panel" @submit.prevent="submit">
       <ErrorMessage v-if="displayedError" :message="displayedError" />
@@ -210,7 +102,7 @@ async function submit() {
       </fieldset>
 
       <div class="form-actions">
-        <BaseButton type="button" variant="secondary" @click="router.back()">Annuler</BaseButton>
+        <BaseButton type="button" variant="secondary" @click="cancel">Annuler</BaseButton>
         <BaseButton type="submit" :disabled="referencesLoading" :loading="planning">
           {{ referencesLoading ? 'Chargement des référentiels…' : 'Planifier le programme' }}
         </BaseButton>

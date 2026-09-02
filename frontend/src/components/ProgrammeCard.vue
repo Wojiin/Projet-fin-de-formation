@@ -2,13 +2,17 @@
 /** Carte de chirurgie qui synthétise son état et propose la prochaine action autorisée. */
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import { formatDateTime } from '@/utils/date'
 
 const props = defineProps({
   chirurgie: { type: Object, required: true },
+  deleting: Boolean,
 })
+
+defineEmits(['remove'])
 
 const surgeonName = computed(
   () => `Dr ${props.chirurgie.chirurgien?.prenom ?? ''} ${props.chirurgie.chirurgien?.nom ?? ''}`.trim(),
@@ -55,6 +59,33 @@ const isPartial = computed(
       >
         Vue finale
       </RouterLink>
+      <BaseButton
+        variant="danger"
+        size="sm"
+        :disabled="chirurgie.valide"
+        :loading="deleting"
+        :title="chirurgie.valide ? 'Une chirurgie validée ne peut pas être supprimée.' : 'Supprimer cette chirurgie'"
+        :aria-label="`Supprimer ${chirurgie.chirurgieModele?.intitule ?? 'la chirurgie'}`"
+        @click="$emit('remove', chirurgie)"
+      >
+        <svg
+          aria-hidden="true"
+          class="size-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 6h18" />
+          <path d="M8 6V4h8v2" />
+          <path d="M19 6l-1 14H6L5 6" />
+          <path d="M10 11v5" />
+          <path d="M14 11v5" />
+        </svg>
+        Supprimer
+      </BaseButton>
     </div>
   </article>
 </template>

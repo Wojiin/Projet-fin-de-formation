@@ -1,22 +1,8 @@
 <script setup>
-/** En-tête du shell protégé : reflète le titre de route et porte la déconnexion. */
-import { computed } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+/** En-tête du shell protégé relié à son composable d'orchestration. */
+import { useAppHeader } from '@/composables/useAppHeader'
 
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const { displayName, isAdmin } = storeToRefs(authStore)
-
-const title = computed(() => route.meta.resolvedTitle ?? route.meta.title ?? 'ChirOrg')
-
-/** Termine la session et remplace l'historique afin d'empêcher le retour sur une vue protégée. */
-async function logout() {
-  await authStore.logout()
-  await router.replace({ name: 'login' })
-}
+const { displayName, isAdmin, logout, title } = useAppHeader()
 </script>
 
 <template>

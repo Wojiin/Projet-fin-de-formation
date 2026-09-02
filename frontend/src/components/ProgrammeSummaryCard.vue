@@ -3,19 +3,13 @@
 import { computed } from 'vue'
 import { formatDate } from '@/utils/date'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
+import { getProgrammeDetailRoute } from '@/config/navigation'
 
 const props = defineProps({
   programme: { type: Object, required: true },
 })
 
-const detailRoute = computed(() => ({
-  name: 'programme-detail',
-  params: {
-    date: props.programme.date,
-    salle: props.programme.salle,
-    chirurgien: props.programme.chirurgien.id,
-  },
-}))
+const detailRoute = computed(() => getProgrammeDetailRoute(props.programme))
 
 const formattedDate = computed(() => formatDate(props.programme.date))
 const progress = computed(

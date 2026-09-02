@@ -15,10 +15,22 @@ Ce document fixe les conventions retenues après revue des versions réellement 
 
 - `Entity/` : modèle Doctrine, opérations API et contrat de sérialisation.
 - `Dto/` : entrées d’actions et sorties agrégées.
-- `State/` : orchestration API Platform seulement lorsqu’un CRUD ou une sous-ressource Doctrine ne suffit pas.
-- `Service/` : règles métier réutilisables, sans lecture manuelle de la requête HTTP.
+- `State/` : adaptateurs API Platform minces, seulement lorsqu’un CRUD ou une sous-ressource Doctrine ne suffit pas.
+- `Service/` : cas d’usage, règles métier, projections et intégrations techniques, sans lecture manuelle de la requête HTTP.
 - `Exception/` : erreurs métier sérialisées par API Platform.
 - `Repository/` : requêtes Doctrine propres au métier; aucun assemblage de réponse HTTP.
+
+## Centralisations issues de l’audit
+
+- `AuthenticatedUserProvider` fournit l’utilisateur courant sans dépendance directe à `Security` dans les processors/providers.
+- `ChirurgieAuditTrail` applique les dates et auteurs à partir de l’horloge applicative.
+- `PreparationProgressCalculator`, `ChirurgieReadModelFactory` et `ProgrammeReadModelFactory` constituent l’unique source des compteurs et projections API.
+- Les services de planification, d’ordre, de préparation, de validation, de suppression et de mot de passe portent les règles d’écriture.
+- `TechnicalSheetImageStorage` isole la validation MIME et le système de fichiers du contrôleur HTTP.
+
+Les tests d’architecture empêchent de réintroduire la sécurité ou le mapping des réponses dans `State`, les opérations de fichiers dans les contrôleurs et les dépendances API Platform dans les services.
+
+Les métadonnées API Platform restent sur les entités et DTO : leur extraction ajouterait de la configuration sans supprimer de duplication. Les dépôts Doctrine simples restent explicites afin de conserver leurs types et leurs futurs critères métier.
 
 ## Documentation de référence
 

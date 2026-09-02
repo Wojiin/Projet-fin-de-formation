@@ -164,6 +164,14 @@
     @apply border-transparent bg-red-600 text-white hover:bg-red-700;
   }
 
+  .button-success {
+    @apply border-transparent bg-green-600 text-white hover:bg-green-700;
+  }
+
+  .button-warning {
+    @apply border-transparent bg-amber-500 text-gray-950 hover:bg-amber-600;
+  }
+
   .button-ghost {
     @apply border-transparent bg-transparent text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700;
   }
@@ -179,6 +187,55 @@
   .button-lg {
     @apply min-h-12 px-5 py-3 text-base;
   }
+
+  .confirmation-content {
+    @apply flex items-start gap-4 rounded-xl border p-4;
+  }
+
+  .confirmation-icon {
+    @apply grid size-11 shrink-0 place-items-center rounded-full;
+  }
+
+  .confirmation-icon svg {
+    @apply size-5;
+  }
+
+  .confirmation-danger {
+    @apply border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/60;
+  }
+
+  .confirmation-danger .confirmation-icon {
+    @apply bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200;
+  }
+
+  .confirmation-success {
+    @apply border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/60;
+  }
+
+  .confirmation-success .confirmation-icon {
+    @apply bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200;
+  }
+
+  .confirmation-warning {
+    @apply border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/60;
+  }
+
+  .confirmation-warning .confirmation-icon {
+    @apply bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200;
+  }
+
+  .confirmation-info {
+    @apply border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/60;
+  }
+
+  .confirmation-info .confirmation-icon {
+    @apply bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200;
+  }
+
+  .confirmation-text-danger { @apply text-red-700 dark:text-red-300; }
+  .confirmation-text-success { @apply text-green-700 dark:text-green-300; }
+  .confirmation-text-warning { @apply text-amber-700 dark:text-amber-300; }
+  .confirmation-text-info { @apply text-blue-700 dark:text-blue-300; }
 
   :where(.primary-link, .compact-primary-link) {
     @apply inline-flex items-center justify-center rounded-xl bg-chirorg-500 text-sm font-semibold text-gray-950 transition hover:bg-chirorg-300;
@@ -356,7 +413,7 @@
   }
 
   .preparation-choice {
-    @apply flex min-h-12 cursor-pointer items-center gap-2 px-4 text-sm font-bold transition has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-inset;
+    @apply flex min-h-12 cursor-pointer items-center gap-2 border border-transparent px-4 text-sm font-bold transition has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-inset;
   }
 
   .preparation-choice input {
@@ -364,11 +421,11 @@
   }
 
   .preparation-choice-ready {
-    @apply bg-green-50 text-green-800 hover:bg-green-100 has-[:checked]:bg-green-600 has-[:checked]:text-white dark:bg-green-950 dark:text-green-200 dark:has-[:checked]:bg-green-700;
+    @apply bg-green-50 text-green-800 hover:border-green-400 hover:bg-green-50/40 has-[:checked]:bg-green-600 has-[:checked]:text-white dark:bg-green-950 dark:text-green-200 dark:hover:border-green-600 dark:hover:bg-green-900/60 dark:has-[:checked]:bg-green-700;
   }
 
   .preparation-choice-absent {
-    @apply border-l border-red-200 bg-red-50 text-red-800 hover:bg-red-100 has-[:checked]:bg-red-600 has-[:checked]:text-white dark:border-red-800 dark:bg-red-950 dark:text-red-200 dark:has-[:checked]:bg-red-700;
+    @apply border-l border-red-200 bg-red-50 text-red-800 hover:border-red-400 hover:bg-red-50/40 has-[:checked]:bg-red-600 has-[:checked]:text-white dark:border-red-800 dark:bg-red-950 dark:text-red-200 dark:hover:border-red-600 dark:hover:bg-red-900/60 dark:has-[:checked]:bg-red-700;
   }
 
   .validated-material {

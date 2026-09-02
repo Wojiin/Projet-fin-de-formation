@@ -69,4 +69,14 @@ describe('ProgrammeGroup', () => {
 
     expect(wrapper.emitted('reorder')).toEqual([[[20, 10]]])
   })
+
+  it('emits the surgery selected from its trash action', async () => {
+    const wrapper = mountGroup()
+
+    await wrapper
+      .get('button[aria-label="Supprimer Intervention A"]')
+      .trigger('click')
+
+    expect(wrapper.emitted('remove')).toEqual([[expect.objectContaining({ id: 10 })]])
+  })
 })

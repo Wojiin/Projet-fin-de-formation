@@ -1,58 +1,29 @@
 <script setup>
-/** Vue du compte connecté et formulaire sécurisé de changement de mot de passe. */
-import { reactive, ref } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useAuthStore } from '@/stores/auth'
-import { authApi } from '@/services/authApi'
-import { getApiErrorMessage } from '@/api/axios'
-import {
-  PASSWORD_PATTERN_SOURCE,
-  PASSWORD_REQUIREMENTS,
-  validatePasswordChange,
-} from '@/utils/password'
+/** Vue du compte : son script ne relie que l'affichage au composable dédié. */
+import { useAccountView } from '@/composables/useAccountView'
 import PageContainer from '@/components/ui/PageContainer.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import ErrorMessage from '@/components/ui/ErrorMessage.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
+import ConfirmationModal from '@/components/ui/ConfirmationModal.vue'
 
-const authStore = useAuthStore()
-const { user, displayName, isAdmin } = storeToRefs(authStore)
-
-const form = reactive({
-  currentPassword: '',
-  newPassword: '',
-  newPasswordConfirmation: '',
-})
-const fieldErrors = reactive({})
-const apiError = ref('')
-const success = ref('')
-const saving = ref(false)
-
-function replaceErrors(errors) {
-  for (const key of Object.keys(fieldErrors)) delete fieldErrors[key]
-  Object.assign(fieldErrors, errors)
-}
-
-async function submitPassword() {
-  apiError.value = ''
-  success.value = ''
-  replaceErrors(validatePasswordChange(form))
-  if (Object.keys(fieldErrors).length > 0) return
-
-  saving.value = true
-  try {
-    await authApi.changePassword({ ...form })
-    form.currentPassword = ''
-    form.newPassword = ''
-    form.newPasswordConfirmation = ''
-    success.value = 'Votre mot de passe a été modifié.'
-  } catch (error) {
-    apiError.value = getApiErrorMessage(error, 'Le mot de passe n’a pas pu être modifié.')
-  } finally {
-    saving.value = false
-  }
-}
+const {
+  PASSWORD_PATTERN_SOURCE,
+  PASSWORD_REQUIREMENTS,
+  apiError,
+  confirmationOpen,
+  cancelConfirmation,
+  confirmPasswordChange,
+  displayName,
+  fieldErrors,
+  form,
+  isAdmin,
+  saving,
+  submitPassword,
+  success,
+  user,
+} = useAccountView()
 </script>
 
 <template>
@@ -124,5 +95,16 @@ async function submitPassword() {
         </div>
       </form>
     </div>
+
+    <ConfirmationModal
+      :open="confirmationOpen"
+      variant="warning"
+      title="Confirmer le changement de mot de passe"
+      message="Cette action modifiera immédiatement vos identifiants de connexion. Voulez-vous continuer ?"
+      confirm-label="Modifier le mot de passe"
+      :loading="saving"
+      @cancel="cancelConfirmation"
+      @confirm="confirmPasswordChange"
+    />
   </PageContainer>
 </template>

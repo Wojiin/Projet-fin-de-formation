@@ -9,9 +9,10 @@ import ProgrammeCard from './ProgrammeCard.vue'
 const props = defineProps({
   programme: { type: Object, required: true },
   saving: Boolean,
+  deletingId: { type: [Number, String], default: null },
 })
 
-const emit = defineEmits(['reorder'])
+const emit = defineEmits(['remove', 'reorder'])
 const draggedId = ref(null)
 const dropTargetId = ref(null)
 const dropPosition = ref('before')
@@ -138,7 +139,11 @@ function move(surgeryId, offset) {
             </button>
           </div>
         </div>
-        <ProgrammeCard :chirurgie="chirurgie" />
+        <ProgrammeCard
+          :chirurgie="chirurgie"
+          :deleting="String(deletingId) === String(chirurgie.id)"
+          @remove="emit('remove', $event)"
+        />
       </li>
     </ol>
   </section>

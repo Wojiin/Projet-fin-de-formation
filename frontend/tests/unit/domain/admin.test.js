@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   filterAdminItems,
   getMaterialsForSurgeon,
-} from '@/services/adminFilters'
-import { buildAdminPayload, createAdminForm, getAdminFormFields } from '@/config/adminForms'
+} from '@/domain/adminFilters'
+import { getAdminFormFields } from '@/config/adminForms'
+import { buildAdminPayload, createAdminForm } from '@/mappers/admin'
 
 describe('speciality filters and material-list form', () => {
   it('filters direct and surgery-related specialities', () => {

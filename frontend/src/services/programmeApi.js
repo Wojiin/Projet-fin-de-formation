@@ -1,4 +1,5 @@
-import { apiClient, unwrapCollection } from '@/api/axios'
+import { apiClient } from '@/api/axios'
+import { unwrapCollection } from '@/api/response'
 
 /** Encapsule les contrats API de consultation, création et réordonnancement des programmes. */
 export const programmeApi = {
@@ -27,5 +28,9 @@ export const programmeApi = {
       { headers: { 'Content-Type': 'application/merge-patch+json' } },
     )
     return data
+  },
+  /** Supprime une chirurgie planifiée lorsque son état métier l'autorise. */
+  async deleteSurgery(id) {
+    await apiClient.delete(`/chirurgies-planifiees/${id}`)
   },
 }
