@@ -42,18 +42,18 @@ class ChirurgieModele
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['chirurgie_modele:read', 'chirurgie_modele:list', 'fiche_technique:read', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgie_modele:read', 'chirurgie_modele:list', 'fiche_technique:read', 'fiche_technique:list', 'liste_materiel:read', 'liste_materiel:list', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 150)]
-    #[Groups(['chirurgie_modele:read', 'chirurgie_modele:list', 'chirurgie_modele:write', 'fiche_technique:read', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgie_modele:read', 'chirurgie_modele:list', 'chirurgie_modele:write', 'fiche_technique:read', 'fiche_technique:list', 'liste_materiel:read', 'liste_materiel:list', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     #[Assert\NotBlank]
     #[Assert\Length(max: 150)]
     private ?string $intitule = null;
 
     #[ORM\ManyToOne(inversedBy: 'chirurgiesModeles')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['chirurgie_modele:read', 'chirurgie_modele:list', 'chirurgie_modele:write', 'fiche_technique:read', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgie_modele:read', 'chirurgie_modele:list', 'chirurgie_modele:write', 'fiche_technique:read', 'fiche_technique:list', 'liste_materiel:read', 'liste_materiel:list', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     #[Assert\NotNull]
     private ?Specialite $specialite = null;
 

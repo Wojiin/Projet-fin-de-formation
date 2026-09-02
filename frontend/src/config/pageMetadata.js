@@ -7,12 +7,13 @@ const routeDescriptions = {
   'programme-detail': 'Consulter les chirurgies et l’ordre de passage d’un programme opératoire.',
   planification: 'Créer un programme opératoire composé de plusieurs chirurgies.',
   preparation: 'Préparer et contrôler le matériel nécessaire à une chirurgie planifiée.',
+  'validation-partielle': 'Régulariser le matériel absent avant la validation finale d’une chirurgie.',
   'vue-finale': 'Consulter la synthèse validée d’une chirurgie et sa fiche technique.',
   admin: 'Administrer les référentiels et les utilisateurs de ChirOrg.',
   'admin-new': 'Ajouter une ressource au référentiel ChirOrg.',
   'admin-edit': 'Modifier une ressource du référentiel ChirOrg.',
   'admin-list': 'Consulter et gérer un référentiel ChirOrg.',
-  account: 'Consulter les informations du compte ChirOrg connecté.',
+  account: 'Consulter le compte ChirOrg connecté et modifier son mot de passe.',
   'not-found': 'La page demandée est introuvable dans l’intranet ChirOrg.',
 }
 
@@ -24,8 +25,8 @@ export function resolvePageTitle(route) {
   const resourceLabel = getAdminResourceLabel(route.params.resource)
 
   if (route.name === 'admin-list') return resourceLabel
-  if (route.name === 'admin-new') return `Ajouter — ${resourceLabel}`
-  if (route.name === 'admin-edit') return `Modifier — ${resourceLabel}`
+  if (route.name === 'admin-new') return `Ajouter ${resourceLabel}`
+  if (route.name === 'admin-edit') return `Modifier ${resourceLabel}`
 
   return route.meta.title ?? 'ChirOrg'
 }

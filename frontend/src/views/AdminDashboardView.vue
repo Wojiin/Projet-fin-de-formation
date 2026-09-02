@@ -1,8 +1,8 @@
 <script setup>
 /** Tableau d'entrée de l'administration, construit à partir de la description déclarative des référentiels. */
 import { adminResources } from '@/config/adminResources'
-import PageContainer from '@/components/layout/PageContainer.vue'
-import AdminResourceCard from '@/components/admin/AdminResourceCard.vue'
+import PageContainer from '@/components/ui/PageContainer.vue'
+import AdminResourceCard from '@/components/AdminResourceCard.vue'
 </script>
 
 <template>

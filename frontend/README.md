@@ -5,7 +5,8 @@ Application monopage Vue 3 de planification et de préparation des programmes op
 ## Architecture
 
 - `src/router` : routes nommées, layout authentifié imbriqué et gardes de navigation ;
-- `src/services` : unique couche HTTP Axios et adaptation des réponses API ;
+- `src/api` : client Axios commun et gestion du renouvellement de session ;
+- `src/services` : appels métier et adaptation des réponses API ;
 - `src/stores` : état global et logique métier Pinia ;
 - `src/views` : orchestration des écrans à partir des props de route et des stores ;
 - `src/components` : composants de présentation et champs de formulaire réutilisables ;
@@ -33,16 +34,16 @@ npm install
 npm run dev
 ```
 
-L’URL de l’API se configure avec `VITE_API_URL`. La valeur de développement par défaut est `http://localhost:8080/api`.
+L’URL de l’API se configure avec `VITE_API_BASE_URL`. La valeur de développement par défaut est `http://localhost:8080/api`.
 
-Avec Docker, le service `frontend` est déclaré dans `backend/compose.yaml` et expose Vite sur `http://localhost:5173`.
+Avec Docker, le service `frontend` est déclaré dans `../docker-compose.dev.yaml` et expose Vite sur `http://localhost:5173`.
 
 ## Validation
 
 ```sh
 npm run build
-npm run test:unit -- --run
+npm run test:unit
 npm run test:e2e
 ```
 
-La suite end-to-end utilise l’API réelle et couvre Chromium, Firefox et WebKit. Elle vérifie notamment la navigation sans rechargement complet et la restauration de session après actualisation.
+Les tests sont regroupés dans `tests/unit` et `tests/e2e`. La suite end-to-end utilise l’API réelle et couvre Chromium, Firefox et WebKit.

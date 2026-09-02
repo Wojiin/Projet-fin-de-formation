@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient'
+import { apiClient } from '@/api/axios'
 
 /** Regroupe les appels relatifs à la checklist matériel et à la clôture d'une chirurgie. */
 export const preparationApi = {
@@ -8,10 +8,10 @@ export const preparationApi = {
     return data
   },
   /** Demande la transition cochée / décochée d'un matériel. */
-  async toggle(id, coche) {
+  async toggle(id, { coche, absent }) {
     const { data } = await apiClient.patch(
       `/preparations-materiel/${id}/cocher`,
-      { coche },
+      { coche, absent },
       { headers: { 'Content-Type': 'application/merge-patch+json' } },
     )
     return data

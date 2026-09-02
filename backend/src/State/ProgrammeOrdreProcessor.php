@@ -6,11 +6,14 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Dto\ProgrammeOperatoire;
 use App\Dto\ProgrammeOrdreInput;
+use App\Entity\User;
 use App\Exception\ApiProblemException;
 use App\Repository\ChirurgiePlanifieeRepository;
 use App\Service\ProgrammeOperatoireService;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -26,6 +29,7 @@ final readonly class ProgrammeOrdreProcessor implements ProcessorInterface
         private ChirurgiePlanifieeRepository $repository,
         private ProgrammeOperatoireService $programmeService,
         private EntityManagerInterface $entityManager,
+        private Security $security,
     ) {
     }
 
@@ -38,6 +42,12 @@ final readonly class ProgrammeOrdreProcessor implements ProcessorInterface
         if (!$data instanceof ProgrammeOrdreInput) {
             throw new \InvalidArgumentException('Une liste ordonnée de chirurgies est attendue.');
         }
+
+        $user = $this->security->getUser();
+        if (!$user instanceof User) {
+            throw new AccessDeniedHttpException('Utilisateur non authentifié.');
+        }
+        $identifier = $user->getUserIdentifier();
 
         $date = $this->parseDate((string) ($uriVariables['date'] ?? ''));
         $salle = trim((string) ($uriVariables['salle'] ?? ''));
@@ -72,9 +82,13 @@ final readonly class ProgrammeOrdreProcessor implements ProcessorInterface
             );
         }
 
-        return $this->entityManager->wrapInTransaction(function () use ($data, $date, $salle, $chirurgienId, $parId): ProgrammeOperatoire {
+        return $this->entityManager->wrapInTransaction(function () use ($data, $date, $salle, $chirurgienId, $parId, $identifier): ProgrammeOperatoire {
+            $now = new \DateTimeImmutable();
             foreach ($data->chirurgieIds as $index => $chirurgieId) {
-                $parId[$chirurgieId]->setOrdre($index + 1);
+                $parId[$chirurgieId]
+                    ->setOrdre($index + 1)
+                    ->setModifieLe($now)
+                    ->setModifiePar($identifier);
             }
             $this->entityManager->flush();
 

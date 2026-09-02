@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import AppShell from "@/components/layout/AppShell.vue";
+import AppShell from "@/components/ui/AppShell.vue";
 import { installAccessGuard } from "@/router/accessGuard";
 
 /** Décrit la SPA : connexion publique, shell protégé et vues chargées à la demande. */
@@ -49,6 +49,13 @@ const routes = [
         component: () => import("@/views/PreparationView.vue"),
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: "Préparation" },
+      },
+      {
+        path: "chirurgies/:id/validation-partielle",
+        name: "validation-partielle",
+        component: () => import("@/views/ValidationPartielleView.vue"),
+        props: (route) => ({ id: Number(route.params.id) }),
+        meta: { title: "Validation partielle" },
       },
       {
         path: "chirurgies/:id/vue-finale",

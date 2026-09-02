@@ -1,12 +1,12 @@
 <script setup>
 /** Vue de création d'un programme multi-chirurgies avec ordre initial et date minimale. */
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { getTomorrowDateValue } from '@/utils/date'
 import { useProgrammeStore } from '@/stores/programme'
 import { useReferenceStore } from '@/stores/references'
-import PageContainer from '@/components/layout/PageContainer.vue'
+import PageContainer from '@/components/ui/PageContainer.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -21,6 +21,7 @@ const { loading: referencesLoading, error: referenceError } = storeToRefs(refere
 const minimumDate = getTomorrowDateValue()
 const formError = ref('')
 const form = reactive({
+  specialiteId: '',
   chirurgienId: '',
   dateProgrammee: minimumDate,
   salle: 'Salle A',
@@ -28,17 +29,31 @@ const form = reactive({
 })
 
 const rooms = ['Salle A', 'Salle B', 'Salle C']
+const specialties = computed(() =>
+  referenceStore
+    .getCollection('specialites')
+    .map((item) => ({ value: item.id, label: item.intitule }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'fr')),
+)
 const surgeons = computed(() =>
-  referenceStore.getCollection('chirurgiens').map((item) => ({
-    value: item.id,
-    label: `Dr ${item.prenom} ${item.nom}`,
-  })),
+  referenceStore
+    .getCollection('chirurgiens')
+    .filter((item) => String(item.specialite?.id) === String(form.specialiteId))
+    .map((item) => ({
+      value: item.id,
+      label: `Dr ${item.prenom} ${item.nom}`,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'fr')),
 )
 const surgeries = computed(() =>
-  referenceStore.getCollection('chirurgie-modeles').map((item) => ({
-    value: item.id,
-    label: item.intitule,
-  })),
+  referenceStore
+    .getCollection('chirurgie-modeles')
+    .filter((item) => String(item.specialite?.id) === String(form.specialiteId))
+    .map((item) => ({
+      value: item.id,
+      label: item.intitule,
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'fr')),
 )
 const displayedError = computed(
   () => formError.value || programmeError.value || referenceError.value,
@@ -56,9 +71,18 @@ function removeSurgery(index) {
   }
 }
 
+/** Efface les choix dépendants lorsqu'une autre spécialité est sélectionnée. */
+watch(
+  () => form.specialiteId,
+  () => {
+    form.chirurgienId = ''
+    form.chirurgieModeleIds = ['']
+  },
+)
+
 onMounted(async () => {
   try {
-    await referenceStore.load(['chirurgiens', 'chirurgie-modeles'])
+    await referenceStore.load(['specialites', 'chirurgiens', 'chirurgie-modeles'])
   } catch {
     // Le store expose le message d'erreur à la vue.
   }
@@ -70,13 +94,23 @@ async function submit() {
   const surgeryModelIds = form.chirurgieModeleIds.map(Number)
 
   if (
+    !form.specialiteId ||
     !form.chirurgienId ||
     !form.dateProgrammee ||
     !form.salle ||
     surgeryModelIds.some((id) => !Number.isInteger(id) || id <= 0)
   ) {
     formError.value =
-      'Le chirurgien, la date, la salle et chaque modèle de chirurgie sont obligatoires.'
+      'La spécialité, le chirurgien, la date, la salle et chaque modèle de chirurgie sont obligatoires.'
+    return
+  }
+  if (
+    !surgeons.value.some((item) => Number(item.value) === Number(form.chirurgienId)) ||
+    surgeryModelIds.some(
+      (id) => !surgeries.value.some((item) => Number(item.value) === id),
+    )
+  ) {
+    formError.value = 'Le chirurgien et les chirurgies doivent correspondre à la spécialité sélectionnée.'
     return
   }
   if (form.dateProgrammee < minimumDate) {
@@ -103,7 +137,7 @@ async function submit() {
       <p class="page-eyebrow">Programme opératoire</p>
       <p class="page-title">Planifier un programme</p>
       <p class="page-description">
-        Définissez la date commune, puis ajoutez les chirurgies dans leur ordre initial.
+        Choisissez une spécialité pour filtrer le chirurgien et les interventions, puis définissez leur ordre initial.
       </p>
     </header>
 
@@ -114,10 +148,18 @@ async function submit() {
         <legend class="section-title">Informations du programme</legend>
         <div class="form-grid mt-5">
           <BaseSelect
+            v-model="form.specialiteId"
+            label="Spécialité"
+            :options="specialties"
+            placeholder="Sélectionner une spécialité"
+            required
+          />
+          <BaseSelect
             v-model="form.chirurgienId"
             label="Chirurgien"
             :options="surgeons"
-            placeholder="Sélectionner un chirurgien"
+            :placeholder="form.specialiteId ? 'Sélectionner un chirurgien' : 'Sélectionner d’abord une spécialité'"
+            :disabled="!form.specialiteId"
             required
           />
           <BaseInput
@@ -145,7 +187,8 @@ async function submit() {
               v-model="form.chirurgieModeleIds[index]"
               :label="`Chirurgie ${index + 1}`"
               :options="surgeries"
-              placeholder="Sélectionner une intervention"
+              :placeholder="form.specialiteId ? 'Sélectionner une intervention' : 'Sélectionner d’abord une spécialité'"
+              :disabled="!form.specialiteId"
               required
             />
             <BaseButton

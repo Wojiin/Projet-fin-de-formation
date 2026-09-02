@@ -3,8 +3,8 @@
 import { watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useProgrammeStore } from '@/stores/programme'
-import PageContainer from '@/components/layout/PageContainer.vue'
-import ProgrammeGroup from '@/components/programme/ProgrammeGroup.vue'
+import PageContainer from '@/components/ui/PageContainer.vue'
+import ProgrammeGroup from '@/components/ProgrammeGroup.vue'
 import ErrorMessage from '@/components/ui/ErrorMessage.vue'
 import LoadingState from '@/components/ui/LoadingState.vue'
 

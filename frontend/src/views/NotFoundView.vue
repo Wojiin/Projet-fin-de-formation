@@ -1,6 +1,6 @@
 <script setup>
 /** Vue de secours rendue lorsqu'aucune route protégée ne correspond à l'URL demandée. */
-import PageContainer from '@/components/layout/PageContainer.vue'
+import PageContainer from '@/components/ui/PageContainer.vue'
 </script>
 
 <template>

@@ -8,14 +8,17 @@ use App\Dto\ProgrammeOperatoire;
 use App\Dto\ProgrammePlanificationInput;
 use App\Dto\ProgrammePlanificationOutput;
 use App\Entity\ChirurgiePlanifiee;
+use App\Entity\User;
 use App\Exception\ApiProblemException;
 use App\Repository\ChirurgienRepository;
 use App\Repository\ChirurgieModeleRepository;
-use App\Repository\ChirurgiePlanifieeRepository;
 use App\Service\PreparationMaterielInitializer;
+use App\Service\ProgrammeOrderAllocator;
 use App\Service\ProgrammeOperatoireService;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -30,10 +33,11 @@ final readonly class ProgrammePlanificationProcessor implements ProcessorInterfa
     public function __construct(
         private ChirurgienRepository $chirurgienRepository,
         private ChirurgieModeleRepository $modeleRepository,
-        private ChirurgiePlanifieeRepository $chirurgieRepository,
         private PreparationMaterielInitializer $initializer,
+        private ProgrammeOrderAllocator $orderAllocator,
         private ProgrammeOperatoireService $programmeService,
         private EntityManagerInterface $entityManager,
+        private Security $security,
     ) {
     }
 
@@ -50,6 +54,12 @@ final readonly class ProgrammePlanificationProcessor implements ProcessorInterfa
         ) {
             throw new \InvalidArgumentException('Un programme opératoire valide est attendu.');
         }
+
+        $user = $this->security->getUser();
+        if (!$user instanceof User) {
+            throw new AccessDeniedHttpException('Utilisateur non authentifié.');
+        }
+        $identifier = $user->getUserIdentifier();
 
         $chirurgien = $this->chirurgienRepository->find($data->chirurgienId)
             ?? throw new NotFoundHttpException('Chirurgien introuvable.');
@@ -69,25 +79,21 @@ final readonly class ProgrammePlanificationProcessor implements ProcessorInterfa
         }
 
         $date = $data->dateProgrammee;
-        $programme = $this->entityManager->wrapInTransaction(function () use ($data, $date, $chirurgien, $modeles): ProgrammeOperatoire {
-            $chirurgiesExistantes = $this->chirurgieRepository->findForProgrammeOperatoire(
-                date: $date,
-                salle: trim($data->salle),
-                chirurgienId: $chirurgien->getId(),
-            );
-            $ordre = array_reduce(
-                $chirurgiesExistantes,
-                static fn (int $maximum, ChirurgiePlanifiee $chirurgie): int => max($maximum, $chirurgie->getOrdre() ?? 0),
-                0,
-            );
+        $programme = $this->entityManager->wrapInTransaction(function () use ($data, $date, $chirurgien, $modeles, $identifier): ProgrammeOperatoire {
+            $ordre = $this->orderAllocator->reserveNextOrder($date, $data->salle, $chirurgien) - 1;
 
             foreach ($modeles as $modele) {
+                $now = new \DateTimeImmutable();
                 $chirurgie = (new ChirurgiePlanifiee())
                     ->setDateProgrammee($data->dateProgrammee)
                     ->setSalle(trim($data->salle))
                     ->setOrdre(++$ordre)
                     ->setChirurgien($chirurgien)
-                    ->setChirurgieModele($modele);
+                    ->setChirurgieModele($modele)
+                    ->setCreeLe($now)
+                    ->setCreePar($identifier)
+                    ->setModifieLe($now)
+                    ->setModifiePar($identifier);
                 $this->entityManager->persist($chirurgie);
                 $this->initializer->initializeForChirurgie($chirurgie, flush: false);
             }

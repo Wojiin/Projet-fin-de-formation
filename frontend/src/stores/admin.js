@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { adminApi } from '@/services/adminApi'
-import { getApiErrorMessage } from '@/services/apiClient'
+import { getApiErrorMessage } from '@/api/axios'
 
 /** Porte l'état et les actions CRUD de l'écran d'administration courant. */
 export const useAdminStore = defineStore('admin', {
@@ -16,13 +16,13 @@ export const useAdminStore = defineStore('admin', {
 
   actions: {
     /** Charge la collection du référentiel demandé et remplace les résultats précédents. */
-    async loadItems(resource) {
+    async loadItems(resource, params = {}) {
       this.resource = resource
       this.loading = true
       this.error = ''
 
       try {
-        this.items = await adminApi.list(resource)
+        this.items = await adminApi.list(resource, params)
         return this.items
       } catch (error) {
         this.items = []

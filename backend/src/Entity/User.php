@@ -10,6 +10,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\OpenApi\Model\Operation as OpenApiOperation;
 use App\Repository\UserRepository;
+use App\Security\PasswordPolicy;
 use App\State\MeProvider;
 use App\State\UserWriteProcessor;
 use App\State\ReferenceDeleteProcessor;
@@ -70,7 +71,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[Groups(['user:write'])]
     #[SerializedName('password')]
-    #[Assert\Length(min: 8, max: 4096)]
+    #[Assert\Length(min: PasswordPolicy::MIN_LENGTH, max: PasswordPolicy::MAX_LENGTH)]
+    #[Assert\Regex(pattern: PasswordPolicy::REGEX, message: PasswordPolicy::MESSAGE)]
     private ?string $plainPassword = null;
 
     /** @var Collection<int, RefreshToken> */

@@ -41,6 +41,7 @@ final readonly class ProgrammeOperatoireService
                 nombreChirurgies: $programme['nombreChirurgies'],
                 nombreChirurgiesValidees: $programme['nombreChirurgiesValidees'],
                 progressionPreparation: $programme['progressionPreparation'],
+                creePar: $programme['creePar'],
             ),
             $programmes,
         ));
@@ -105,7 +106,9 @@ final readonly class ProgrammeOperatoireService
             'chirurgien' => ['id' => $chirurgien?->getId(), 'prenom' => $chirurgien?->getPrenom(), 'nom' => $chirurgien?->getNom()],
             'nombreChirurgies' => 0,
             'nombreChirurgiesValidees' => 0,
-            'progressionPreparation' => ['total' => 0, 'coches' => 0, 'complete' => false],
+            'progressionPreparation' => ['total' => 0, 'coches' => 0, 'absents' => 0, 'traites' => 0, 'complete' => false],
+            'creeLe' => $chirurgie->getCreeLe(),
+            'creePar' => $chirurgie->getCreePar(),
         ];
     }
 
@@ -116,6 +119,13 @@ final readonly class ProgrammeOperatoireService
      */
     private function addChirurgieToProgramme(array &$programme, ChirurgiePlanifiee $chirurgie): void
     {
+        if (null !== $chirurgie->getCreeLe()
+            && (null === $programme['creeLe'] || $chirurgie->getCreeLe() < $programme['creeLe'])
+        ) {
+            $programme['creeLe'] = $chirurgie->getCreeLe();
+            $programme['creePar'] = $chirurgie->getCreePar();
+        }
+
         ++$programme['nombreChirurgies'];
         if ($chirurgie->isValide()) {
             ++$programme['nombreChirurgiesValidees'];
@@ -126,9 +136,13 @@ final readonly class ProgrammeOperatoireService
             if ($preparation->isCoche()) {
                 ++$programme['progressionPreparation']['coches'];
             }
+            if ($preparation->isAbsent()) {
+                ++$programme['progressionPreparation']['absents'];
+            }
         }
         $progression = $programme['progressionPreparation'];
-        $programme['progressionPreparation']['complete'] = $progression['total'] > 0 && $progression['total'] === $progression['coches'];
+        $programme['progressionPreparation']['traites'] = $progression['coches'] + $progression['absents'];
+        $programme['progressionPreparation']['complete'] = $progression['total'] > 0 && $progression['total'] === $programme['progressionPreparation']['traites'];
     }
 
     /**
@@ -140,19 +154,27 @@ final readonly class ProgrammeOperatoireService
     {
         $preparations = [];
         $coches = 0;
+        $absents = 0;
         foreach ($chirurgie->getPreparationsMateriel() as $preparation) {
             $preparations[] = $this->preparationData($preparation);
             $coches += $preparation->isCoche() ? 1 : 0;
+            $absents += $preparation->isAbsent() ? 1 : 0;
         }
+        $traites = $coches + $absents;
         $modele = $chirurgie->getChirurgieModele();
         $data = [
             'id' => $chirurgie->getId() ?? 0,
             'dateProgrammee' => $chirurgie->getDateProgrammee()?->format('Y-m-d') ?? '',
             'ordre' => $chirurgie->getOrdre(),
             'valide' => $chirurgie->isValide(),
+            'etatValidation' => $chirurgie->isValide() ? 'VALIDEE' : (count($preparations) > 0 && $traites === count($preparations) && $absents > 0 ? 'VALIDATION_PARTIELLE' : 'EN_PREPARATION'),
             'valideLe' => $chirurgie->getValideLe()?->format(DateTimeInterface::ATOM),
+            'creeLe' => $chirurgie->getCreeLe()?->format(DateTimeInterface::ATOM),
+            'creePar' => $chirurgie->getCreePar(),
+            'modifieLe' => $chirurgie->getModifieLe()?->format(DateTimeInterface::ATOM),
+            'modifiePar' => $chirurgie->getModifiePar(),
             'chirurgieModele' => ['id' => $modele?->getId(), 'intitule' => $modele?->getIntitule()],
-            'progressionPreparation' => ['total' => count($preparations), 'coches' => $coches, 'complete' => count($preparations) > 0 && count($preparations) === $coches],
+            'progressionPreparation' => ['total' => count($preparations), 'coches' => $coches, 'absents' => $absents, 'traites' => $traites, 'complete' => count($preparations) > 0 && count($preparations) === $traites],
             'preparationsMateriel' => $preparations,
         ];
 
@@ -177,6 +199,7 @@ final readonly class ProgrammeOperatoireService
         return [
             'id' => $preparation->getId(),
             'coche' => $preparation->isCoche(),
+            'absent' => $preparation->isAbsent(),
             'cocheLe' => $preparation->getCocheLe()?->format(DateTimeInterface::ATOM),
             'materiel' => ['id' => $materiel?->getId(), 'intitule' => $materiel?->getIntitule(), 'adresse' => $materiel?->getAdresse(), 'typeMateriel' => $materiel?->getTypeMateriel()],
         ];

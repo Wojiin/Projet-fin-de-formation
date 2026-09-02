@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { authApi } from '@/services/authApi'
-import { getApiErrorMessage, refreshAccessToken } from '@/services/apiClient'
+import { getApiErrorMessage, refreshAccessToken } from '@/api/axios'
+import { getUserFromAccessToken } from '@/utils/jwt'
 
 // Empêche plusieurs gardes de route de lancer simultanément le même refresh silencieux.
 let initializationPromise = null
@@ -34,11 +35,29 @@ export const useAuthStore = defineStore('auth', {
       this.token = null
     },
 
+    /** Initialise directement l'écran public de connexion sans provoquer un refresh anonyme en 401. */
+    initializeGuestSession() {
+      this.clearSession()
+      this.initializing = false
+      this.initialized = true
+    },
+
     /** Récupère le profil associé au JWT courant pour compléter la session en mémoire. */
     async fetchMe() {
       const user = await authApi.me()
       this.user = user
       return user
+    },
+
+    /** Utilise les claims signés du JWT et ne sollicite `/me` qu'en solution de repli. */
+    async hydrateUser(token) {
+      const tokenUser = getUserFromAccessToken(token)
+      if (tokenUser) {
+        this.user = tokenUser
+        return tokenUser
+      }
+
+      return this.fetchMe()
     },
 
     /** Authentifie l'utilisateur, conserve le token en mémoire puis hydrate son profil. */
@@ -49,7 +68,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const data = await authApi.login(credentials)
         this.setAccessToken(data.token)
-        await this.fetchMe()
+        await this.hydrateUser(data.token)
         this.initialized = true
         return true
       } catch (error) {
@@ -72,7 +91,7 @@ export const useAuthStore = defineStore('auth', {
           if (!this.token) {
             this.setAccessToken(await refreshAccessToken())
           }
-          await this.fetchMe()
+          await this.hydrateUser(this.token)
           return true
         } catch {
           this.clearSession()

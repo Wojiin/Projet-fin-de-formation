@@ -17,10 +17,14 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: FicheTechniqueRepository::class)]
+#[Assert\Expression(
+    expression: 'this.getDescription() !== null or this.getLienImage() !== null',
+    message: 'Une consigne technique doit contenir du texte, une image ou les deux.',
+)]
 #[ApiResource(
     description: 'Fiche technique décrivant les consignes liées à une chirurgie modèle.',
     operations: [
-        new GetCollection(uriTemplate: '/fiches-techniques', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['fiche_technique:list']], openapi: new OpenApiOperation(summary: 'Lister les fiches techniques', description: 'Retourne les fiches techniques disponibles pour les chirurgies modèles.')),
+        new GetCollection(uriTemplate: '/fiches-techniques', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['fiche_technique:list']], paginationEnabled: false, openapi: new OpenApiOperation(summary: 'Lister les fiches techniques', description: 'Retourne les fiches techniques disponibles pour les chirurgies modèles.')),
         new GetCollection(uriTemplate: '/chirurgie-modeles/{id}/fiches-techniques', uriVariables: ['id' => new Link(fromClass: ChirurgieModele::class, toProperty: 'chirurgieModele')], security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['fiche_technique:read']], order: ['ordre' => 'ASC'], openapi: new OpenApiOperation(summary: 'Lister les fiches d’une chirurgie modèle', description: 'Retourne les consignes techniques rattachées à une intervention type.')),
         new Get(uriTemplate: '/fiches-techniques/{id}', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['fiche_technique:read']], openapi: new OpenApiOperation(summary: 'Consulter une fiche technique', description: 'Retourne le détail d’une consigne technique à partir de son identifiant.')),
         new Post(uriTemplate: '/fiches-techniques', security: "is_granted('ROLE_ADMIN')", denormalizationContext: ['groups' => ['fiche_technique:write']], normalizationContext: ['groups' => ['fiche_technique:read']], openapi: new OpenApiOperation(summary: 'Créer une fiche technique', description: 'Ajoute une consigne technique à une chirurgie modèle.')),
@@ -42,13 +46,16 @@ class FicheTechnique
     #[Assert\NotBlank]
     #[Assert\Length(max: 150)]
     private ?string $titre = null;
-    #[ORM\Column(type: Types::TEXT)]
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['fiche_technique:read', 'fiche_technique:write', 'vue_finale:read'])]
-    #[Assert\NotBlank]
     private ?string $description = null;
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['fiche_technique:read', 'fiche_technique:write', 'vue_finale:read'])]
     #[Assert\Length(max: 255)]
+    #[Assert\Regex(
+        pattern: '/^\/uploads\/fiches-techniques\/[A-Za-z0-9._-]+$/',
+        message: 'L’image doit provenir du service de téléversement ChirOrg.',
+    )]
     private ?string $lienImage = null;
     #[ORM\Column]
     #[Groups(['fiche_technique:read', 'fiche_technique:list', 'fiche_technique:write', 'vue_finale:read'])]
@@ -57,7 +64,7 @@ class FicheTechnique
     private ?int $ordre = null;
     #[ORM\ManyToOne(inversedBy: 'fichesTechniques')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['fiche_technique:read', 'fiche_technique:write'])]
+    #[Groups(['fiche_technique:read', 'fiche_technique:list', 'fiche_technique:write'])]
     #[Assert\NotNull]
     private ?ChirurgieModele $chirurgieModele = null;
 
@@ -82,9 +89,10 @@ class FicheTechnique
         return $this->description;
     }
 
-    public function setDescription(string $description): static
+    public function setDescription(?string $description): static
     {
-        $this->description = $description;
+        $description = null === $description ? '' : trim($description);
+        $this->description = '' === $description ? null : $description;
         return $this;
     }
 
@@ -95,7 +103,8 @@ class FicheTechnique
 
     public function setLienImage(?string $lienImage): static
     {
-        $this->lienImage = $lienImage;
+        $lienImage = null === $lienImage ? '' : trim($lienImage);
+        $this->lienImage = '' === $lienImage ? null : $lienImage;
         return $this;
     }
 

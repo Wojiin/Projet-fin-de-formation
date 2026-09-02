@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { preparationApi } from '@/services/preparationApi'
-import { getApiErrorMessage } from '@/services/apiClient'
+import { getApiErrorMessage } from '@/api/axios'
 
 /** Adapte la réponse de checklist de l'API au modèle attendu par l'interface de préparation. */
 export function normalizePreparation(data) {
@@ -13,6 +13,7 @@ export function normalizePreparation(data) {
       ordre: data.ordre,
       valide: data.valide,
       valideLe: data.valideLe,
+      etatValidation: data.etatValidation ?? (data.valide ? 'VALIDEE' : 'EN_PREPARATION'),
       chirurgien: data.chirurgien,
       chirurgieModele: data.chirurgieModele,
     },
@@ -62,7 +63,7 @@ export function normalizeFinalView(data) {
     fichesTechniques: technicalSheets.map((sheet) => ({
       ...sheet,
       contenu: sheet.contenu ?? sheet.description ?? '',
-      image: sheet.image ?? Boolean(sheet.lienImage),
+      image: sheet.image ?? sheet.lienImage ?? null,
     })),
   }
 }
@@ -81,6 +82,11 @@ export const usePreparationStore = defineStore('preparation', {
     isComplete: (state) =>
       Boolean(state.preparation?.preparations?.length) &&
       state.preparation.preparations.every((item) => item.coche),
+    isResolved: (state) =>
+      Boolean(state.preparation?.preparations?.length) &&
+      state.preparation.preparations.every((item) => item.coche || item.absent),
+    isPartial: (state) =>
+      state.preparation?.chirurgie?.etatValidation === 'VALIDATION_PARTIELLE',
   },
 
   actions: {
@@ -90,10 +96,14 @@ export const usePreparationStore = defineStore('preparation', {
 
       const total = this.preparation.preparations.length
       const coches = this.preparation.preparations.filter((item) => item.coche).length
+      const absents = this.preparation.preparations.filter((item) => item.absent).length
+      const traites = coches + absents
       this.preparation.progressionPreparation = {
         total,
         coches,
-        complete: total > 0 && total === coches,
+        absents,
+        traites,
+        complete: total > 0 && total === traites,
       }
     },
 
@@ -117,19 +127,23 @@ export const usePreparationStore = defineStore('preparation', {
     },
 
     /** Bascule l'état d'un matériel de façon optimiste puis restaure l'ancien état si l'API échoue. */
-    async toggleMaterial(item) {
-      const previousValue = item.coche
-      item.coche = !previousValue
+    async setMaterialState(item, state) {
+      const previous = { coche: item.coche, absent: item.absent }
+      item.coche = state === 'ready' ? !item.coche : false
+      item.absent = state === 'absent' ? !item.absent : false
       this.updateProgress()
       this.savingId = item.id
       this.error = ''
 
       try {
-        Object.assign(item, await preparationApi.toggle(item.id, item.coche))
+        Object.assign(item, await preparationApi.toggle(item.id, {
+          coche: item.coche,
+          absent: item.absent,
+        }))
         this.updateProgress()
         return true
       } catch (error) {
-        item.coche = previousValue
+        Object.assign(item, previous)
         this.updateProgress()
         this.error = getApiErrorMessage(error, 'La mise à jour du matériel a échoué.')
         return false
@@ -138,9 +152,13 @@ export const usePreparationStore = defineStore('preparation', {
       }
     },
 
+    async toggleMaterial(item) {
+      return this.setMaterialState(item, 'ready')
+    },
+
     /** Valide une chirurgie uniquement lorsque toutes ses lignes sont cochées. */
     async validateSurgery() {
-      if (!this.isComplete || !this.preparation) return false
+      if (!this.isResolved || !this.preparation) return false
 
       this.loading = true
       this.error = ''
@@ -150,8 +168,9 @@ export const usePreparationStore = defineStore('preparation', {
         this.preparation.chirurgie = {
           ...this.preparation.chirurgie,
           ...data,
+          etatValidation: data.valide ? 'VALIDEE' : 'VALIDATION_PARTIELLE',
         }
-        return true
+        return data.valide ? 'final' : 'partial'
       } catch (error) {
         this.error = getApiErrorMessage(error, 'La validation de la chirurgie a échoué.')
         return false

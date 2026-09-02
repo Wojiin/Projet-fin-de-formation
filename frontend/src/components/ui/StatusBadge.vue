@@ -8,6 +8,9 @@ const props = defineProps({
 
 const classes = computed(() => {
   const status = props.status.toLowerCase()
+  if (status.includes('partielle')) {
+    return 'badge-warning'
+  }
   if (status.includes('valid') || status.includes('prêt') || status.includes('complete')) {
     return 'badge-success'
   }

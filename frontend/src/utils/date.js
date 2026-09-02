@@ -27,3 +27,16 @@ export function formatDate(value, fallback = 'Non renseignée') {
   if (Number.isNaN(date.getTime())) return fallback
   return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' }).format(date)
 }
+
+/** Affiche un horodatage avec la date et l'heure locales. */
+export function formatDateTime(value, fallback = 'Non renseignée') {
+  if (!value) return fallback
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return fallback
+
+  return new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(date)
+}

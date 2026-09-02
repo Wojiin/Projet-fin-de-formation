@@ -49,6 +49,9 @@ class PreparationMateriel
     #[Groups(['preparation_materiel:read', 'preparation_materiel:list', 'preparation_materiel:write', 'preparation:read', 'vue_finale:read'])]
     #[Assert\NotNull]
     private bool $coche = false;
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['preparation_materiel:read', 'preparation_materiel:list', 'preparation:read', 'vue_finale:read'])]
+    private bool $absent = false;
     #[ORM\Column(nullable: true)]
     #[Groups(['preparation_materiel:read', 'preparation_materiel:list', 'preparation:read', 'vue_finale:read'])]
     private ?\DateTimeImmutable $cocheLe = null;
@@ -80,6 +83,18 @@ class PreparationMateriel
     public function setCoche(bool $coche): static
     {
         $this->coche = $coche;
+        return $this;
+    }
+
+    public function isAbsent(): bool
+    {
+        return $this->absent;
+    }
+
+    public function setAbsent(bool $absent): static
+    {
+        $this->absent = $absent;
+
         return $this;
     }
 

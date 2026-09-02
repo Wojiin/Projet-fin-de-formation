@@ -1,26 +1,39 @@
 import { createApp } from "vue";
-import { createPinia } from "pinia";
 import App from "./App.vue";
 import router from "./router";
-import { configureApiAuth } from "./services/apiClient";
+import { configureApiAuth } from "./api/axios";
+import { createSessionExpiredHandler } from "./services/sessionExpiry";
 import { useAuthStore } from "./stores/auth";
-import "./assets/main.css";
+import { pinia } from "./stores/pinia";
+import "./index.css";
 
 /** Point d'entrée : restaure la session Pinia avant d'autoriser la première navigation. */
 const app = createApp(App);
-const pinia = createPinia();
+
+// Lance le téléchargement de la route principale pendant la restauration de session.
+if (["/", "/programme"].includes(window.location.pathname)) {
+  void import("./views/ProgrammeOperatoireView.vue");
+}
 
 app.use(pinia);
 
 const authStore = useAuthStore(pinia);
+const onSessionExpired = createSessionExpiredHandler({
+  router,
+  clearSession: () => authStore.clearSession(),
+});
 configureApiAuth({
   getAccessToken: () => authStore.token,
   setAccessToken: (token) => authStore.setAccessToken(token),
-  onSessionExpired: () => authStore.clearSession(),
+  onSessionExpired,
 });
 
 async function bootstrap() {
-  await authStore.initialize();
+  if (window.location.pathname === "/login") {
+    authStore.initializeGuestSession();
+  } else {
+    await authStore.initialize();
+  }
   app.use(router);
   await router.isReady();
   app.mount("#app");

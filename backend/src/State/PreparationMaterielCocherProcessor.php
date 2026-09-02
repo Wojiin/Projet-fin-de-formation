@@ -33,27 +33,39 @@ final readonly class PreparationMaterielCocherProcessor implements ProcessorInte
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): PreparationMateriel
     {
-        if (!$data instanceof PreparationMaterielInput || null === $data->coche) {
+        if (!$data instanceof PreparationMaterielInput || (null === $data->coche && null === $data->absent)) {
             throw new \InvalidArgumentException('Un état de préparation valide est attendu.');
+        }
+
+        $coche = $data->coche ?? false;
+        $absent = $data->absent ?? false;
+        if ($coche && $absent) {
+            throw new \InvalidArgumentException('Un matériel ne peut pas être à la fois prêt et absent.');
         }
 
         $preparation = $this->repository->find((int) ($uriVariables['id'] ?? 0))
             ?? throw new NotFoundHttpException('Préparation de matériel introuvable.');
 
-        if ($preparation->getChirurgiePlanifiee()?->isValide()) {
+        $chirurgie = $preparation->getChirurgiePlanifiee();
+        if ($chirurgie?->isValide()) {
             throw new ApiProblemException('PREPARATION_VERROUILLEE', 'Le matériel d’une chirurgie validée ne peut plus être modifié.');
         }
 
-        $preparation->setCoche($data->coche);
-        if ($data->coche) {
-            $user = $this->security->getUser();
-            if (!$user instanceof User) {
-                throw new AccessDeniedHttpException('Utilisateur non authentifié.');
-            }
-            $preparation->setCocheLe(new \DateTimeImmutable())->setCochePar($user);
+        $user = $this->security->getUser();
+        if (!$user instanceof User) {
+            throw new AccessDeniedHttpException('Utilisateur non authentifié.');
+        }
+
+        $now = new \DateTimeImmutable();
+        $preparation->setCoche($coche)->setAbsent($absent);
+        if ($coche) {
+            $preparation->setCocheLe($now)->setCochePar($user);
         } else {
             $preparation->setCocheLe(null)->setCochePar(null);
         }
+        $chirurgie
+            ?->setModifieLe($now)
+            ->setModifiePar($user->getUserIdentifier());
 
         $this->entityManager->flush();
 

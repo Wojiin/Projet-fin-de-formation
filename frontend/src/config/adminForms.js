@@ -6,15 +6,17 @@ export const referencesByResource = {
   'chirurgie-modeles': ['specialites'],
   materiels: ['specialites'],
   'fiches-techniques': ['chirurgie-modeles'],
-  'listes-materiel': ['chirurgiens', 'chirurgie-modeles'],
+  'listes-materiel': ['chirurgiens', 'chirurgie-modeles', 'materiels'],
 }
 
 /** Convertit un référentiel en options compatibles avec les champs select. */
 function optionsFrom(items, label) {
-  return items.map((item) => ({
-    value: item.id,
-    label: label(item),
-  }))
+  return items
+    .map((item) => ({
+      value: item.id,
+      label: label(item),
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'fr', { sensitivity: 'base' }))
 }
 
 /** Retourne le schéma de formulaire correspondant à une ressource administrative. */
@@ -31,6 +33,13 @@ export function getAdminFormFields(resource, collections = {}) {
     collections['chirurgie-modeles'] ?? [],
     (item) => item.intitule,
   )
+  const materialOptions = (collections.materiels ?? [])
+    .map((item) => ({
+      value: item.id,
+      label: item.intitule,
+      meta: [item.specialite?.intitule, item.typeMateriel, item.adresse].filter(Boolean).join(' · '),
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, 'fr', { sensitivity: 'base' }))
 
   const schemas = {
     specialites: [
@@ -81,7 +90,14 @@ export function getAdminFormFields(resource, collections = {}) {
         key: 'description',
         label: 'Consigne technique',
         type: 'textarea',
-        required: true,
+        required: false,
+      },
+      {
+        key: 'imageFile',
+        label: 'Illustration de la consigne',
+        type: 'file',
+        accept: 'image/jpeg,image/png,image/webp',
+        required: false,
       },
       { key: 'ordre', label: 'Ordre', type: 'number', required: true },
       {
@@ -106,6 +122,13 @@ export function getAdminFormFields(resource, collections = {}) {
         label: 'Chirurgie modèle',
         type: 'select',
         options: surgeryOptions,
+        required: true,
+      },
+      {
+        key: 'materiels',
+        label: 'Composition de la liste',
+        type: 'material-picker',
+        options: materialOptions,
         required: true,
       },
     ],
@@ -143,6 +166,10 @@ export function createAdminForm(fields, existing = null) {
         return [field.key, role]
       }
 
+      if (field.type === 'material-picker') {
+        return [field.key, (existing?.[field.key] ?? []).map(normalizeInitialValue)]
+      }
+
       return [field.key, normalizeInitialValue(existing?.[field.key])]
     }),
   )
@@ -151,6 +178,7 @@ export function createAdminForm(fields, existing = null) {
 /** Convertit les valeurs du formulaire en payload API Platform, notamment pour les relations. */
 export function buildAdminPayload(form) {
   const payload = { ...form }
+  delete payload.imageFile
   const relations = {
     specialite: 'specialites',
     chirurgien: 'chirurgiens',
@@ -166,6 +194,15 @@ export function buildAdminPayload(form) {
     delete payload.role
   }
   if (!payload.password) delete payload.password
+  if (Object.hasOwn(payload, 'description')) {
+    payload.description = payload.description?.trim() || null
+  }
+  if (Object.hasOwn(payload, 'materiels')) {
+    payload.materiels = payload.materiels.map((material) => {
+      const id = typeof material === 'object' ? material.id : material
+      return `/api/materiels/${id}`
+    })
+  }
   if (payload.ordre !== undefined && payload.ordre !== '') {
     payload.ordre = Number(payload.ordre)
   }

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { programmeApi } from '@/services/programmeApi'
-import { getApiErrorMessage, unwrapCollection } from '@/services/apiClient'
+import { getApiErrorMessage, unwrapCollection } from '@/api/axios'
 
 /** Uniformise une chirurgie planifiée, quelle que soit la forme du payload API reçu. */
 export function normalizePlannedSurgery(data) {
@@ -10,9 +10,11 @@ export function normalizePlannedSurgery(data) {
     progressionPreparation: data.progressionPreparation ?? {
       total: data.preparationsMateriel?.length ?? 0,
       coches: data.preparationsMateriel?.filter((item) => item.coche).length ?? 0,
+      absents: data.preparationsMateriel?.filter((item) => item.absent).length ?? 0,
+      traites: data.preparationsMateriel?.filter((item) => item.coche || item.absent).length ?? 0,
       complete:
         Boolean(data.preparationsMateriel?.length) &&
-        data.preparationsMateriel.every((item) => item.coche),
+        data.preparationsMateriel.every((item) => item.coche || item.absent),
     },
   }
 }

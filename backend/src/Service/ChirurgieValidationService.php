@@ -9,7 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Applique la règle de clôture d'une chirurgie : une chirurgie n'est validable
- * que lorsque chacune de ses préparations de matériel est cochée.
+ * lorsque chaque matériel est soit prêt, soit explicitement déclaré absent.
  */
 final readonly class ChirurgieValidationService
 {
@@ -31,16 +31,30 @@ final readonly class ChirurgieValidationService
             throw new ApiProblemException('MATERIEL_PREPARATION_INCOMPLETE', 'La chirurgie ne possède aucune préparation de matériel.');
         }
 
+        $hasAbsent = false;
         foreach ($chirurgie->getPreparationsMateriel() as $preparation) {
-            if (!$preparation->isCoche()) {
-                throw new ApiProblemException('MATERIEL_PREPARATION_INCOMPLETE', 'Tout le matériel doit être coché avant la validation.');
+            if (!$preparation->isCoche() && !$preparation->isAbsent()) {
+                throw new ApiProblemException('MATERIEL_PREPARATION_INCOMPLETE', 'Tout le matériel doit être déclaré prêt ou absent avant la validation.');
             }
+            $hasAbsent = $hasAbsent || $preparation->isAbsent();
+        }
+
+        $now = new \DateTimeImmutable();
+        if ($hasAbsent) {
+            $chirurgie
+                ->setModifieLe($now)
+                ->setModifiePar($user->getUserIdentifier());
+            $this->entityManager->flush();
+
+            return $chirurgie;
         }
 
         $chirurgie
             ->setValide(true)
-            ->setValideLe(new \DateTimeImmutable())
-            ->setValidePar($user);
+            ->setValideLe($now)
+            ->setValidePar($user)
+            ->setModifieLe($now)
+            ->setModifiePar($user->getUserIdentifier());
 
         $this->entityManager->flush();
 

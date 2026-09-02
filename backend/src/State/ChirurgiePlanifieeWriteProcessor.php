@@ -5,9 +5,13 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\ChirurgiePlanifiee;
-use App\Repository\ChirurgiePlanifieeRepository;
+use App\Entity\User;
 use App\Service\PreparationMaterielInitializer;
+use App\Service\ProgrammeOrderAllocator;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Encadre l'écriture d'une chirurgie planifiée : calcule sa position initiale
@@ -19,7 +23,9 @@ final readonly class ChirurgiePlanifieeWriteProcessor implements ProcessorInterf
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
         private PreparationMaterielInitializer $initializer,
-        private ChirurgiePlanifieeRepository $repository,
+        private ProgrammeOrderAllocator $orderAllocator,
+        private EntityManagerInterface $entityManager,
+        private Security $security,
     ) {
     }
 
@@ -33,27 +39,45 @@ final readonly class ChirurgiePlanifieeWriteProcessor implements ProcessorInterf
             throw new \InvalidArgumentException('Une chirurgie planifiée est attendue.');
         }
 
-        if (null === $data->getId()
-            && null !== $data->getDateProgrammee()
-            && null !== $data->getSalle()
-            && null !== $data->getChirurgien()?->getId()
-        ) {
-            $maximum = array_reduce(
-                $this->repository->findForProgrammeOperatoire(
-                    date: $data->getDateProgrammee(),
-                    salle: $data->getSalle(),
-                    chirurgienId: $data->getChirurgien()->getId(),
-                ),
-                static fn (int $order, ChirurgiePlanifiee $chirurgie): int => max($order, $chirurgie->getOrdre() ?? 0),
-                0,
-            );
-            $data->setOrdre($maximum + 1);
+        $user = $this->security->getUser();
+        if (!$user instanceof User) {
+            throw new AccessDeniedHttpException('Utilisateur non authentifié.');
         }
 
-        $this->initializer->findListe($data);
-        $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
-        $this->initializer->initializeForChirurgie($data);
+        $isNew = null === $data->getId();
+        $now = new \DateTimeImmutable();
+        $identifier = $user->getUserIdentifier();
+        if ($isNew) {
+            $data
+                ->setCreeLe($now)
+                ->setCreePar($identifier)
+                ->setModifieLe($now)
+                ->setModifiePar($identifier);
+        } else {
+            $data->setModifieLe($now)->setModifiePar($identifier);
+        }
 
-        return $result;
+        if (!$isNew) {
+            return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        }
+
+        return $this->entityManager->wrapInTransaction(function () use ($data, $operation, $uriVariables, $context): ChirurgiePlanifiee {
+            if (null !== $data->getDateProgrammee()
+                && null !== $data->getSalle()
+                && null !== $data->getChirurgien()
+            ) {
+                $data->setOrdre($this->orderAllocator->reserveNextOrder(
+                    $data->getDateProgrammee(),
+                    $data->getSalle(),
+                    $data->getChirurgien(),
+                ));
+            }
+
+            $this->initializer->findListe($data);
+            $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+            $this->initializer->initializeForChirurgie($data);
+
+            return $result;
+        });
     }
 }

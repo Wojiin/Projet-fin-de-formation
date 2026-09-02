@@ -1,4 +1,4 @@
-import { apiClient, unwrapCollection } from './apiClient'
+import { apiClient, unwrapCollection } from '@/api/axios'
 
 /** Encapsule les contrats API de consultation, création et réordonnancement des programmes. */
 export const programmeApi = {

@@ -85,7 +85,11 @@ final class AppFixtures extends Fixture
                     ->setChirurgien($chirurgien)
                     ->setChirurgieModele($modele);
 
-                foreach ($this->pickMaterielsForList($materiels, $chirurgienIndex, $modeleIndex) as $materiel) {
+                $materielsCompatibles = array_values(array_filter(
+                    $materiels,
+                    static fn (Materiel $materiel): bool => $materiel->getSpecialite() === $chirurgien->getSpecialite(),
+                ));
+                foreach ($this->pickMaterielsForList($materielsCompatibles, $chirurgienIndex, $modeleIndex) as $materiel) {
                     $liste->addMateriel($materiel);
                 }
 
@@ -153,12 +157,18 @@ final class AppFixtures extends Fixture
     /** Crée une chirurgie planifiée avec son identité de programme et son ordre initial. */
     private function createChirurgie(\DateTimeImmutable $date, string $salle, int $ordre, Chirurgien $chirurgien, ChirurgieModele $modele): ChirurgiePlanifiee
     {
+        $now = new \DateTimeImmutable();
+
         return (new ChirurgiePlanifiee())
             ->setDateProgrammee($date)
             ->setSalle($salle)
             ->setOrdre($ordre)
             ->setChirurgien($chirurgien)
-            ->setChirurgieModele($modele);
+            ->setChirurgieModele($modele)
+            ->setCreeLe($now)
+            ->setCreePar('admin@chirorg.test')
+            ->setModifieLe($now)
+            ->setModifiePar('admin@chirorg.test');
     }
 
     /** Retourne les modèles de chirurgie et l'index de leur spécialité de fixture.

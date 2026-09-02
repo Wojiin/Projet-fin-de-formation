@@ -10,8 +10,11 @@ const props = defineProps({
   required: Boolean,
   autocomplete: { type: String, default: undefined },
   min: { type: [String, Number], default: undefined },
+  minlength: { type: [String, Number], default: undefined },
+  maxlength: { type: [String, Number], default: undefined },
+  pattern: { type: String, default: undefined },
 })
-const model = defineModel({ type: [String, Number], default: '' })
+const model = defineModel({ type: [String, Number], required: true })
 
 const id = useId()
 const errorId = computed(() => `${id}-error`)
@@ -30,6 +33,9 @@ const errorId = computed(() => `${id}-error`)
       :required="required"
       :autocomplete="autocomplete"
       :min="min"
+      :minlength="minlength"
+      :maxlength="maxlength"
+      :pattern="pattern"
       :aria-invalid="Boolean(error)"
       :aria-describedby="error ? errorId : undefined"
       class="field-control"

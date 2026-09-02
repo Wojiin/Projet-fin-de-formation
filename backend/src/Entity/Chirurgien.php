@@ -25,7 +25,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'Référentiel des chirurgiens utilisés pour la planification des interventions.',
     operations: [
-        new GetCollection(uriTemplate: '/chirurgiens', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgien:list']], parameters: [
+        new GetCollection(uriTemplate: '/chirurgiens', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['chirurgien:list']], paginationEnabled: false, parameters: [
             'nom' => new QueryParameter(property: 'nom', filter: new PartialSearchFilter()),
             'prenom' => new QueryParameter(property: 'prenom', filter: new PartialSearchFilter()),
             'specialite' => new QueryParameter(property: 'specialite', filter: new ExactFilter()),
@@ -43,24 +43,24 @@ class Chirurgien
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['chirurgien:read', 'chirurgien:list', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgien:read', 'chirurgien:list', 'liste_materiel:read', 'liste_materiel:list', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['chirurgien:read', 'chirurgien:list', 'chirurgien:write', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgien:read', 'chirurgien:list', 'chirurgien:write', 'liste_materiel:read', 'liste_materiel:list', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     #[Assert\NotBlank]
     #[Assert\Length(max: 100)]
     private ?string $prenom = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['chirurgien:read', 'chirurgien:list', 'chirurgien:write', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgien:read', 'chirurgien:list', 'chirurgien:write', 'liste_materiel:read', 'liste_materiel:list', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     #[Assert\NotBlank]
     #[Assert\Length(max: 100)]
     private ?string $nom = null;
 
     #[ORM\ManyToOne(inversedBy: 'chirurgiens')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['chirurgien:read', 'chirurgien:list', 'chirurgien:write', 'liste_materiel:read', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
+    #[Groups(['chirurgien:read', 'chirurgien:list', 'chirurgien:write', 'liste_materiel:read', 'liste_materiel:list', 'chirurgie_planifiee:read', 'programme:read', 'preparation:read', 'vue_finale:read'])]
     #[Assert\NotNull]
     private ?Specialite $specialite = null;
 

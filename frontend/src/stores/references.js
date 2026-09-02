@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { adminApi } from '@/services/adminApi'
-import { getApiErrorMessage } from '@/services/apiClient'
+import { getApiErrorMessage } from '@/api/axios'
 
 /** Met en cache les petits référentiels partagés par les formulaires et la planification. */
 export const useReferenceStore = defineStore('references', {

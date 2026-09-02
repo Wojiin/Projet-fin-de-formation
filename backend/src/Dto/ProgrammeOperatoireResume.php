@@ -13,6 +13,7 @@ final class ProgrammeOperatoireResume
         public readonly int $nombreChirurgies,
         public readonly int $nombreChirurgiesValidees,
         public readonly array $progressionPreparation,
+        public readonly ?string $creePar,
     ) {
     }
 }

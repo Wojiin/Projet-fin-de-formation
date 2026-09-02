@@ -38,12 +38,15 @@ final readonly class ChirurgiePreparationProvider implements ProviderInterface
 
         $preparations = [];
         $coches = 0;
+        $absents = 0;
         foreach ($chirurgie->getPreparationsMateriel() as $preparation) {
             $materiel = $preparation->getMateriel();
             $coches += $preparation->isCoche() ? 1 : 0;
+            $absents += $preparation->isAbsent() ? 1 : 0;
             $preparations[] = [
                 'id' => $preparation->getId(),
                 'coche' => $preparation->isCoche(),
+                'absent' => $preparation->isAbsent(),
                 'cocheLe' => $preparation->getCocheLe()?->format(DateTimeInterface::ATOM),
                 'materiel' => [
                     'id' => $materiel?->getId(),
@@ -55,6 +58,7 @@ final readonly class ChirurgiePreparationProvider implements ProviderInterface
         }
 
         $total = count($preparations);
+        $traites = $coches + $absents;
         $chirurgien = $chirurgie->getChirurgien();
         $modele = $chirurgie->getChirurgieModele();
 
@@ -64,10 +68,11 @@ final readonly class ChirurgiePreparationProvider implements ProviderInterface
             salle: $chirurgie->getSalle() ?? '',
             ordre: $chirurgie->getOrdre(),
             valide: $chirurgie->isValide(),
+            etatValidation: $chirurgie->isValide() ? 'VALIDEE' : ($total > 0 && $traites === $total && $absents > 0 ? 'VALIDATION_PARTIELLE' : 'EN_PREPARATION'),
             chirurgien: ['id' => $chirurgien?->getId(), 'prenom' => $chirurgien?->getPrenom(), 'nom' => $chirurgien?->getNom()],
             chirurgieModele: ['id' => $modele?->getId(), 'intitule' => $modele?->getIntitule()],
             preparationsMateriel: $preparations,
-            progressionPreparation: ['total' => $total, 'coches' => $coches, 'complete' => $total > 0 && $total === $coches],
+            progressionPreparation: ['total' => $total, 'coches' => $coches, 'absents' => $absents, 'traites' => $traites, 'complete' => $total > 0 && $total === $traites],
         );
     }
 }
