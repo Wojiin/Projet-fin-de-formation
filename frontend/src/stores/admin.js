@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { adminApi } from '@/services/adminApi'
-import { getApiErrorMessage } from '@/services/apiClient'
+import { getApiErrorMessage } from '@/api/response'
 
 /** Porte l'état et les actions CRUD de l'écran d'administration courant. */
 export const useAdminStore = defineStore('admin', {
@@ -8,28 +8,38 @@ export const useAdminStore = defineStore('admin', {
     resource: '',
     items: [],
     current: null,
-    loading: false,
+    pendingLoads: 0,
+    listRequestId: 0,
+    itemRequestId: 0,
     saving: false,
     deletingId: null,
     error: '',
   }),
 
+  getters: {
+    loading: (state) => state.pendingLoads > 0,
+  },
+
   actions: {
     /** Charge la collection du référentiel demandé et remplace les résultats précédents. */
-    async loadItems(resource) {
+    async loadItems(resource, params = {}) {
       this.resource = resource
-      this.loading = true
+      const requestId = ++this.listRequestId
+      this.pendingLoads += 1
       this.error = ''
 
       try {
-        this.items = await adminApi.list(resource)
-        return this.items
+        const items = await adminApi.list(resource, params)
+        if (requestId === this.listRequestId) this.items = items
+        return items
       } catch (error) {
-        this.items = []
-        this.error = getApiErrorMessage(error, 'Impossible de charger ce référentiel.')
+        if (requestId === this.listRequestId) {
+          this.items = []
+          this.error = getApiErrorMessage(error, 'Impossible de charger ce référentiel.')
+        }
         return []
       } finally {
-        this.loading = false
+        this.pendingLoads -= 1
       }
     },
 
@@ -37,17 +47,21 @@ export const useAdminStore = defineStore('admin', {
     async loadItem(resource, id) {
       this.resource = resource
       this.current = null
-      this.loading = true
+      const requestId = ++this.itemRequestId
+      this.pendingLoads += 1
       this.error = ''
 
       try {
-        this.current = await adminApi.get(resource, id)
-        return this.current
+        const item = await adminApi.get(resource, id)
+        if (requestId === this.itemRequestId) this.current = item
+        return item
       } catch (error) {
-        this.error = getApiErrorMessage(error, 'Impossible de charger cette ressource.')
+        if (requestId === this.itemRequestId) {
+          this.error = getApiErrorMessage(error, 'Impossible de charger cette ressource.')
+        }
         return null
       } finally {
-        this.loading = false
+        this.pendingLoads -= 1
       }
     },
 

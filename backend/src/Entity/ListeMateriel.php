@@ -19,15 +19,17 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: ListeMaterielRepository::class)]
 #[ORM\UniqueConstraint(name: 'uniq_liste_chirurgien_modele', columns: ['chirurgien_id', 'chirurgie_modele_id'])]
 #[ApiResource(
     description: 'Liste de matériel personnalisée pour un couple chirurgien / chirurgie modèle.',
     operations: [
-        new GetCollection(uriTemplate: '/listes-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:list']], parameters: [
+        new GetCollection(uriTemplate: '/listes-materiel', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:list']], paginationEnabled: false, parameters: [
             'chirurgien' => new QueryParameter(property: 'chirurgien', filter: new ExactFilter()),
             'chirurgieModele' => new QueryParameter(property: 'chirurgieModele', filter: new ExactFilter()),
+            'specialite' => new QueryParameter(property: 'chirurgieModele.specialite', filter: new ExactFilter()),
         ], openapi: new OpenApiOperation(summary: 'Lister les listes de matériel', description: 'Retourne les listes de matériel personnalisées par chirurgien et chirurgie modèle.')),
         new GetCollection(uriTemplate: '/chirurgiens/{id}/listes-materiel', uriVariables: ['id' => new Link(fromClass: Chirurgien::class, toProperty: 'chirurgien')], security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:read']], order: ['intitule' => 'ASC'], openapi: new OpenApiOperation(summary: 'Lister les listes d’un chirurgien', description: 'Retourne les listes de matériel associées à un chirurgien donné.')),
         new GetCollection(uriTemplate: '/chirurgie-modeles/{id}/listes-materiel', uriVariables: ['id' => new Link(fromClass: ChirurgieModele::class, toProperty: 'chirurgieModele')], security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['liste_materiel:read']], order: ['intitule' => 'ASC'], openapi: new OpenApiOperation(summary: 'Lister les listes d’une chirurgie modèle', description: 'Retourne les listes de matériel associées à une intervention type.')),
@@ -53,18 +55,19 @@ class ListeMateriel
     private ?string $intitule = null;
     #[ORM\ManyToOne(inversedBy: 'listesMateriel')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['liste_materiel:read', 'liste_materiel:write'])]
+    #[Groups(['liste_materiel:read', 'liste_materiel:list', 'liste_materiel:write'])]
     #[Assert\NotNull]
     private ?Chirurgien $chirurgien = null;
     #[ORM\ManyToOne(inversedBy: 'listesMateriel')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['liste_materiel:read', 'liste_materiel:write'])]
+    #[Groups(['liste_materiel:read', 'liste_materiel:list', 'liste_materiel:write'])]
     #[Assert\NotNull]
     private ?ChirurgieModele $chirurgieModele = null;
     /** @var Collection<int, Materiel> */
     #[ORM\ManyToMany(targetEntity: Materiel::class, inversedBy: 'listesMateriel')]
     #[ORM\JoinTable(name: 'liste_materiel_materiel')]
     #[Groups(['liste_materiel:read', 'liste_materiel:write', 'preparation:read'])]
+    #[Assert\Count(min: 1, minMessage: 'La liste doit contenir au moins un matériel.')]
     private Collection $materiels;
 
     /** Initialise la collection des matériels de la liste. */
@@ -131,5 +134,23 @@ class ListeMateriel
     {
         $this->materiels->removeElement($materiel);
         return $this;
+    }
+
+    #[Assert\Callback]
+    public function validateMaterielSpecialities(ExecutionContextInterface $context): void
+    {
+        $specialite = $this->chirurgien?->getSpecialite();
+        if (null === $specialite) {
+            return;
+        }
+
+        foreach ($this->materiels as $materiel) {
+            if ($materiel->getSpecialite() !== $specialite) {
+                $context->buildViolation('Tous les matériels doivent appartenir à la spécialité du chirurgien.')
+                    ->atPath('materiels')
+                    ->addViolation();
+                return;
+            }
+        }
     }
 }

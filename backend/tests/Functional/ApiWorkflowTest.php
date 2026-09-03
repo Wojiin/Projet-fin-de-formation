@@ -95,6 +95,7 @@ final class ApiWorkflowTest extends ApiTestCase
         self::assertNotEmpty($programme);
         self::assertArrayHasKey('progressionPreparation', $programme[0]);
         self::assertArrayHasKey('nombreChirurgies', $programme[0]);
+        self::assertSame('admin@chirorg.test', $programme[0]['creePar']);
         self::assertNotEmpty(array_filter(
             $programme,
             static fn (array $item): bool => $item['nombreChirurgies'] >= 2,
@@ -209,6 +210,10 @@ final class ApiWorkflowTest extends ApiTestCase
             self::assertSame($programmeDate->format('Y-m-d'), $chirurgie['dateProgrammee']);
             self::assertStringNotContainsString('T', $chirurgie['dateProgrammee']);
             self::assertArrayNotHasKey('heure', $chirurgie);
+            self::assertSame('user@chirorg.test', $chirurgie['creePar']);
+            self::assertSame('user@chirorg.test', $chirurgie['modifiePar']);
+            self::assertNotEmpty($chirurgie['creeLe']);
+            self::assertNotEmpty($chirurgie['modifieLe']);
         }
 
         $client->request('GET', '/api/programmes-operatoires', ['headers' => $headers]);
@@ -228,6 +233,20 @@ final class ApiWorkflowTest extends ApiTestCase
         $programmeReordonne = $client->getResponse()->toArray();
         self::assertSame($idsInverses, array_column($programmeReordonne['chirurgies'], 'id'));
         self::assertSame([1, 2], array_column($programmeReordonne['chirurgies'], 'ordre'));
+        foreach ($programmeReordonne['chirurgies'] as $chirurgie) {
+            self::assertSame('user@chirorg.test', $chirurgie['modifiePar']);
+            self::assertNotEmpty($chirurgie['modifieLe']);
+        }
+
+        $client->request('DELETE', '/api/chirurgies-planifiees/'.$idsInverses[0], ['headers' => $headers]);
+        self::assertResponseStatusCodeSame(204);
+        self::assertNull($this->chirurgieRepository()->find($idsInverses[0]));
+
+        $chirurgieValidee = $this->chirurgieRepository()->findOneBy(['valide' => true]);
+        self::assertInstanceOf(ChirurgiePlanifiee::class, $chirurgieValidee);
+        $client->request('DELETE', '/api/chirurgies-planifiees/'.$chirurgieValidee->getId(), ['headers' => $headers]);
+        self::assertResponseStatusCodeSame(409);
+        self::assertSame('RESOURCE_ALREADY_USED', $client->getResponse()->toArray(false)['errorCode']);
     }
 
     public function testPreparationAndValidationWorkflow(): void
@@ -268,9 +287,19 @@ final class ApiWorkflowTest extends ApiTestCase
             self::assertTrue($client->getResponse()->toArray()['coche']);
         }
 
+        $entityManager = static::getContainer()->get(EntityManagerInterface::class);
+        $entityManager->clear();
+        $chirurgieModifiee = $this->chirurgieRepository()->find($chirurgie->getId());
+        self::assertInstanceOf(ChirurgiePlanifiee::class, $chirurgieModifiee);
+        self::assertSame('user@chirorg.test', $chirurgieModifiee->getModifiePar());
+        self::assertNotNull($chirurgieModifiee->getModifieLe());
+
         $client->request('POST', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/validation', ['headers' => $headers]);
         self::assertResponseIsSuccessful();
-        self::assertTrue($client->getResponse()->toArray()['valide']);
+        $chirurgieValidee = $client->getResponse()->toArray();
+        self::assertTrue($chirurgieValidee['valide']);
+        self::assertSame('user@chirorg.test', $chirurgieValidee['modifiePar']);
+        self::assertNotEmpty($chirurgieValidee['modifieLe']);
 
         $client->request('GET', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/vue-finale', ['headers' => $headers]);
         self::assertResponseIsSuccessful();
@@ -295,6 +324,46 @@ final class ApiWorkflowTest extends ApiTestCase
 
         $client->request('GET', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/vue-finale', ['headers' => $this->headers($token)]);
         self::assertResponseStatusCodeSame(409);
+    }
+
+    public function testAbsentMaterialCreatesPartialValidationThenCanBeResolved(): void
+    {
+        $client = static::createClient();
+        $token = $this->login($client, 'user@chirorg.test');
+        $headers = $this->headers($token);
+        $chirurgie = $this->chirurgieRepository()->findOneBy(['salle' => 'Salle C', 'valide' => false]);
+        self::assertInstanceOf(ChirurgiePlanifiee::class, $chirurgie);
+        $this->resetPreparation($chirurgie);
+
+        $client->request('GET', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/preparation', ['headers' => $headers]);
+        $items = $client->getResponse()->toArray()['preparationsMateriel'];
+
+        foreach ($items as $index => $item) {
+            $client->request('PATCH', '/api/preparations-materiel/'.$item['id'].'/cocher', [
+                'headers' => $headers + ['Content-Type' => 'application/merge-patch+json'],
+                'json' => ['coche' => 0 !== $index, 'absent' => 0 === $index],
+            ]);
+            self::assertResponseIsSuccessful();
+        }
+
+        $client->request('POST', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/validation', ['headers' => $headers]);
+        self::assertResponseIsSuccessful();
+        self::assertFalse($client->getResponse()->toArray()['valide']);
+
+        $client->request('GET', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/preparation', ['headers' => $headers]);
+        $partial = $client->getResponse()->toArray();
+        self::assertSame('VALIDATION_PARTIELLE', $partial['etatValidation']);
+        self::assertSame(1, $partial['progressionPreparation']['absents']);
+
+        $client->request('PATCH', '/api/preparations-materiel/'.$items[0]['id'].'/cocher', [
+            'headers' => $headers + ['Content-Type' => 'application/merge-patch+json'],
+            'json' => ['coche' => true, 'absent' => false],
+        ]);
+        self::assertResponseIsSuccessful();
+
+        $client->request('POST', '/api/chirurgies-planifiees/'.$chirurgie->getId().'/validation', ['headers' => $headers]);
+        self::assertResponseIsSuccessful();
+        self::assertTrue($client->getResponse()->toArray()['valide']);
     }
 
     public function testSuppressionSpecialiteReaffecteToutesLesReferences(): void
@@ -353,7 +422,7 @@ final class ApiWorkflowTest extends ApiTestCase
     {
         $chirurgie->setValide(false)->setValideLe(null)->setValidePar(null);
         foreach ($chirurgie->getPreparationsMateriel() as $preparation) {
-            $preparation->setCoche(false)->setCocheLe(null)->setCochePar(null);
+            $preparation->setCoche(false)->setAbsent(false)->setCocheLe(null)->setCochePar(null);
         }
 
         static::getContainer()->get(EntityManagerInterface::class)->flush();

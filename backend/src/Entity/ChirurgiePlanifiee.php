@@ -51,8 +51,8 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Get(uriTemplate: '/chirurgies-planifiees/{id}/vue-finale', security: "is_granted('ROLE_USER')", output: ChirurgieVueFinale::class, provider: VueFinaleProvider::class, openapi: new OpenApiOperation(summary: 'Consulter la vue finale', description: 'Retourne la synthèse finale d’une chirurgie avec les consignes et l’état du matériel.')),
         new Post(uriTemplate: '/chirurgies-planifiees', security: "is_granted('ROLE_USER')", denormalizationContext: ['groups' => ['chirurgie_planifiee:write']], normalizationContext: ['groups' => ['chirurgie_planifiee:read']], processor: ChirurgiePlanifieeWriteProcessor::class, openapi: new OpenApiOperation(summary: 'Planifier une chirurgie', description: 'Crée une chirurgie planifiée et initialise sa préparation matériel.')),
         new Post(uriTemplate: '/chirurgies-planifiees/{id}/validation', security: "is_granted('ROLE_USER')", input: false, output: ChirurgiePlanifiee::class, normalizationContext: ['groups' => ['chirurgie_planifiee:read']], processor: ChirurgieValidationProcessor::class, openapi: new OpenApiOperation(summary: 'Valider une chirurgie', description: 'Marque une chirurgie planifiée comme validée par l’utilisateur connecté.')),
-        new Patch(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_USER')", denormalizationContext: ['groups' => ['chirurgie_planifiee:write']], normalizationContext: ['groups' => ['chirurgie_planifiee:read']], openapi: new OpenApiOperation(summary: 'Modifier une chirurgie planifiée', description: 'Met à jour la date, la salle, l’ordre ou les références d’une chirurgie planifiée.')),
-        new Delete(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_ADMIN')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une chirurgie planifiée', description: 'Supprime une chirurgie planifiée si les règles métier l’autorisent.')),
+        new Patch(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_USER')", denormalizationContext: ['groups' => ['chirurgie_planifiee:write']], normalizationContext: ['groups' => ['chirurgie_planifiee:read']], processor: ChirurgiePlanifieeWriteProcessor::class, openapi: new OpenApiOperation(summary: 'Modifier une chirurgie planifiée', description: 'Met à jour la date, la salle, l’ordre ou les références d’une chirurgie planifiée.')),
+        new Delete(uriTemplate: '/chirurgies-planifiees/{id}', security: "is_granted('ROLE_USER')", processor: ReferenceDeleteProcessor::class, openapi: new OpenApiOperation(summary: 'Supprimer une chirurgie planifiée', description: 'Supprime une chirurgie planifiée non validée du programme opératoire.')),
     ]
 )]
 /** Représente une intervention datée, ordonnée dans un programme et suivie jusqu'à sa validation. */
@@ -99,6 +99,18 @@ class ChirurgiePlanifiee
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     #[Groups(['chirurgie_planifiee:read', 'vue_finale:read'])]
     private ?User $validePar = null;
+    #[ORM\Column(nullable: true)]
+    #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'programme:read'])]
+    private ?\DateTimeImmutable $creeLe = null;
+    #[ORM\Column(length: 180, nullable: true)]
+    #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'programme:read'])]
+    private ?string $creePar = null;
+    #[ORM\Column(nullable: true)]
+    #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'programme:read'])]
+    private ?\DateTimeImmutable $modifieLe = null;
+    #[ORM\Column(length: 180, nullable: true)]
+    #[Groups(['chirurgie_planifiee:read', 'chirurgie_planifiee:list', 'programme:read'])]
+    private ?string $modifiePar = null;
     /** @var Collection<int, PreparationMateriel> */
     #[ORM\OneToMany(targetEntity: PreparationMateriel::class, mappedBy: 'chirurgiePlanifiee', orphanRemoval: true)]
     #[Groups(['preparation:read', 'vue_finale:read'])]
@@ -200,6 +212,54 @@ class ChirurgiePlanifiee
     public function setValidePar(?User $user): static
     {
         $this->validePar = $user;
+        return $this;
+    }
+
+    public function getCreeLe(): ?\DateTimeImmutable
+    {
+        return $this->creeLe;
+    }
+
+    public function setCreeLe(?\DateTimeImmutable $creeLe): static
+    {
+        $this->creeLe = $creeLe;
+
+        return $this;
+    }
+
+    public function getCreePar(): ?string
+    {
+        return $this->creePar;
+    }
+
+    public function setCreePar(?string $creePar): static
+    {
+        $this->creePar = $creePar;
+
+        return $this;
+    }
+
+    public function getModifieLe(): ?\DateTimeImmutable
+    {
+        return $this->modifieLe;
+    }
+
+    public function setModifieLe(?\DateTimeImmutable $modifieLe): static
+    {
+        $this->modifieLe = $modifieLe;
+
+        return $this;
+    }
+
+    public function getModifiePar(): ?string
+    {
+        return $this->modifiePar;
+    }
+
+    public function setModifiePar(?string $modifiePar): static
+    {
+        $this->modifiePar = $modifiePar;
+
         return $this;
     }
 

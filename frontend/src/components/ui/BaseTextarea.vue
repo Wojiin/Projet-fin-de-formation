@@ -9,7 +9,7 @@ const props = defineProps({
   required: Boolean,
   rows: { type: Number, default: 4 },
 })
-const model = defineModel({ type: String, default: '' })
+const model = defineModel({ type: String, required: true })
 
 const id = useId()
 const errorId = computed(() => `${id}-error`)

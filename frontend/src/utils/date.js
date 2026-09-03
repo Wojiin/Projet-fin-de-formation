@@ -4,7 +4,7 @@ function pad(value) {
 }
 
 /** Convertit une date locale en valeur compatible avec un champ input[type=date]. */
-export function toDateInputValue(date) {
+function toDateInputValue(date) {
   return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-')
 }
 
@@ -26,4 +26,17 @@ export function formatDate(value, fallback = 'Non renseignée') {
 
   if (Number.isNaN(date.getTime())) return fallback
   return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' }).format(date)
+}
+
+/** Affiche un horodatage avec la date et l'heure locales. */
+export function formatDateTime(value, fallback = 'Non renseignée') {
+  if (!value) return fallback
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return fallback
+
+  return new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+  }).format(date)
 }

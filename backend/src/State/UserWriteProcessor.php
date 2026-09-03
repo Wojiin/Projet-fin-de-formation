@@ -6,9 +6,9 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\User;
+use App\Service\UserPasswordService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /** Garantit qu'aucun mot de passe en clair n'est persisté pour un utilisateur. */
 final readonly class UserWriteProcessor implements ProcessorInterface
@@ -16,7 +16,7 @@ final readonly class UserWriteProcessor implements ProcessorInterface
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
-        private UserPasswordHasherInterface $passwordHasher,
+        private UserPasswordService $passwordService,
     ) {
     }
 
@@ -35,10 +35,7 @@ final readonly class UserWriteProcessor implements ProcessorInterface
             throw new UnprocessableEntityHttpException('Le mot de passe est obligatoire à la création.');
         }
 
-        if (null !== $plainPassword) {
-            $data->setPassword($this->passwordHasher->hashPassword($data, $plainPassword));
-            $data->setPlainPassword(null);
-        }
+        $this->passwordService->hashPlainPassword($data);
 
         return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
     }

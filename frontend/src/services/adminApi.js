@@ -1,10 +1,14 @@
-import { apiClient, unwrapCollection } from './apiClient'
+import { apiClient } from '@/api/axios'
+import { unwrapCollection } from '@/api/response'
 
 /** Porte les appels CRUD génériques des référentiels administratifs, sans état d'interface. */
 export const adminApi = {
   /** Liste une ressource API et normalise les formats de collection API Platform. */
   async list(resource, params = {}) {
-    const { data } = await apiClient.get(`/${resource}`, { params })
+    const { data } = await apiClient.get(`/${resource}`, {
+      params,
+      headers: { Accept: 'application/json' },
+    })
     return unwrapCollection(data)
   },
   /** Charge une ressource administrative par son identifiant. */

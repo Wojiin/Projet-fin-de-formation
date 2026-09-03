@@ -9,8 +9,9 @@ const props = defineProps({
   error: { type: String, default: '' },
   required: Boolean,
   allowEmpty: Boolean,
+  disabled: Boolean,
 })
-const model = defineModel({ type: [String, Number], default: '' })
+const model = defineModel({ type: [String, Number], required: true })
 
 const id = useId()
 const errorId = computed(() => `${id}-error`)
@@ -30,6 +31,7 @@ const normalizedOptions = computed(() =>
       :id="id"
       v-model="model"
       :required="required"
+      :disabled="disabled"
       :aria-invalid="Boolean(error)"
       :aria-describedby="error ? errorId : undefined"
       class="field-control"

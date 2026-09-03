@@ -13,6 +13,8 @@ const props = defineProps({
 const classes = computed(() => {
   const variants = {
     primary: 'button-primary',
+    success: 'button-success',
+    warning: 'button-warning',
     secondary: 'button-secondary',
     danger: 'button-danger',
     ghost: 'button-ghost',

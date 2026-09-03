@@ -6,12 +6,9 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Dto\PreparationMaterielInput;
 use App\Entity\PreparationMateriel;
-use App\Entity\User;
-use App\Exception\ApiProblemException;
 use App\Repository\PreparationMaterielRepository;
-use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use App\Service\AuthenticatedUserProvider;
+use App\Service\PreparationMaterielService;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -22,8 +19,8 @@ final readonly class PreparationMaterielCocherProcessor implements ProcessorInte
 {
     public function __construct(
         private PreparationMaterielRepository $repository,
-        private EntityManagerInterface $entityManager,
-        private Security $security,
+        private PreparationMaterielService $preparationService,
+        private AuthenticatedUserProvider $authenticatedUser,
     ) {
     }
 
@@ -33,30 +30,18 @@ final readonly class PreparationMaterielCocherProcessor implements ProcessorInte
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): PreparationMateriel
     {
-        if (!$data instanceof PreparationMaterielInput || null === $data->coche) {
+        if (!$data instanceof PreparationMaterielInput || (null === $data->coche && null === $data->absent)) {
             throw new \InvalidArgumentException('Un état de préparation valide est attendu.');
         }
 
         $preparation = $this->repository->find((int) ($uriVariables['id'] ?? 0))
             ?? throw new NotFoundHttpException('Préparation de matériel introuvable.');
 
-        if ($preparation->getChirurgiePlanifiee()?->isValide()) {
-            throw new ApiProblemException('PREPARATION_VERROUILLEE', 'Le matériel d’une chirurgie validée ne peut plus être modifié.');
-        }
-
-        $preparation->setCoche($data->coche);
-        if ($data->coche) {
-            $user = $this->security->getUser();
-            if (!$user instanceof User) {
-                throw new AccessDeniedHttpException('Utilisateur non authentifié.');
-            }
-            $preparation->setCocheLe(new \DateTimeImmutable())->setCochePar($user);
-        } else {
-            $preparation->setCocheLe(null)->setCochePar(null);
-        }
-
-        $this->entityManager->flush();
-
-        return $preparation;
+        return $this->preparationService->updateState(
+            $preparation,
+            $data->coche ?? false,
+            $data->absent ?? false,
+            $this->authenticatedUser->getUser(),
+        );
     }
 }

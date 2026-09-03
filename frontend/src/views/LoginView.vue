@@ -1,9 +1,6 @@
 <script setup>
-/** Vue publique de connexion : délègue l'authentification au store puis restaure la destination demandée. */
-import { reactive } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+/** Vue publique de connexion : son script ne relie que l'affichage au composable dédié. */
+import { useLoginView } from '@/composables/useLoginView'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import ErrorMessage from '@/components/ui/ErrorMessage.vue'
@@ -12,28 +9,7 @@ const props = defineProps({
   redirect: { type: String, default: '' },
 })
 
-const router = useRouter()
-const authStore = useAuthStore()
-const { error, loading } = storeToRefs(authStore)
-const form = reactive({
-  email: '',
-  password: '',
-})
-
-/** Accepte uniquement une redirection interne afin d'éviter toute redirection ouverte. */
-function destinationAfterLogin() {
-  if (props.redirect.startsWith('/') && !props.redirect.startsWith('//')) {
-    return props.redirect
-  }
-  return { name: 'programme' }
-}
-
-/** Envoie les identifiants, puis remplace l'historique par la première vue autorisée. */
-async function submit() {
-  if (await authStore.login({ ...form })) {
-    await router.replace(destinationAfterLogin())
-  }
-}
+const { error, form, loading, submit } = useLoginView(props)
 </script>
 
 <template>

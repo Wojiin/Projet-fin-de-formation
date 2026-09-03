@@ -25,7 +25,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     description: 'Référentiel du matériel utilisé pour préparer les chirurgies.',
     operations: [
-        new GetCollection(uriTemplate: '/materiels', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['materiel:list']], parameters: [
+        new GetCollection(uriTemplate: '/materiels', security: "is_granted('ROLE_USER')", normalizationContext: ['groups' => ['materiel:list']], paginationEnabled: false, parameters: [
             'intitule' => new QueryParameter(property: 'intitule', filter: new PartialSearchFilter()),
             'typeMateriel' => new QueryParameter(property: 'typeMateriel', filter: new ExactFilter()),
             'adresse' => new QueryParameter(property: 'adresse', filter: new PartialSearchFilter()),

@@ -1,138 +1,106 @@
 <script setup>
-/** Vue de formulaire générique : combine le schéma de ressource, ses références et le store CRUD. */
-import { computed, reactive, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
-import { getAdminResource } from '@/config/adminResources'
-import {
-  buildAdminPayload,
-  createAdminForm,
-  getAdminFormFields,
-  referencesByResource,
-} from '@/config/adminForms'
-import { useAdminStore } from '@/stores/admin'
-import { useReferenceStore } from '@/stores/references'
-import PageContainer from '@/components/layout/PageContainer.vue'
+/** Vue de formulaire administratif : son script ne relie que l'affichage au composable dédié. */
+import { useAdminFormView } from '@/composables/useAdminFormView'
+import PageContainer from '@/components/ui/PageContainer.vue'
+import PageHeading from '@/components/ui/PageHeading.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseTextarea from '@/components/ui/BaseTextarea.vue'
+import MaterialPicker from '@/components/MaterialPicker.vue'
 import ErrorMessage from '@/components/ui/ErrorMessage.vue'
+import ConfirmationModal from '@/components/ui/ConfirmationModal.vue'
 
 const props = defineProps({
   resourceSlug: { type: String, required: true },
   id: { type: Number, default: null },
 })
 
-const router = useRouter()
-const adminStore = useAdminStore()
-const referenceStore = useReferenceStore()
 const {
-  loading: itemLoading,
+  currentImageUrl,
+  confirmationOpen,
+  cancelConfirmation,
+  confirmSubmit,
+  displayedError,
+  fields,
+  fileInputKey,
+  form,
+  isEditing,
+  loading,
+  goBack,
+  removeImage,
+  resource,
   saving,
-  error: adminError,
-} = storeToRefs(adminStore)
-const {
-  loading: referencesLoading,
-  error: referenceError,
-} = storeToRefs(referenceStore)
-
-const form = reactive({})
-const formError = ref('')
-const resource = computed(() => getAdminResource(props.resourceSlug))
-const isEditing = computed(() => Number.isInteger(props.id) && props.id > 0)
-const fields = computed(() =>
-  getAdminFormFields(props.resourceSlug, referenceStore.collections),
-)
-const loading = computed(
-  () => itemLoading.value || referencesLoading.value || saving.value,
-)
-const displayedError = computed(() => {
-  if (!resource.value) return 'Ce référentiel n’existe pas.'
-  return formError.value || adminError.value || referenceError.value
-})
-
-/** Remplace l'état réactif sans conserver de champ de la ressource précédemment affichée. */
-function replaceForm(values) {
-  for (const key of Object.keys(form)) delete form[key]
-  Object.assign(form, values)
-}
-
-/** Charge en parallèle les références de sélection et la ressource à éditer lorsque nécessaire. */
-async function loadForm() {
-  formError.value = ''
-  if (!resource.value) {
-    replaceForm({})
-    return
-  }
-
-  const references = referencesByResource[props.resourceSlug] ?? []
-
-  try {
-    const [, existing] = await Promise.all([
-      referenceStore.load(references),
-      isEditing.value
-        ? adminStore.loadItem(props.resourceSlug, props.id)
-        : Promise.resolve(null),
-    ])
-    replaceForm(createAdminForm(fields.value, existing))
-  } catch {
-    replaceForm(createAdminForm(fields.value))
-  }
-}
-
-/** Vérifie les champs obligatoires, persiste le payload et invalide le cache concerné. */
-async function submit() {
-  formError.value = ''
-  const missingField = fields.value.find((field) => field.required && !form[field.key])
-  if (missingField) {
-    formError.value = `Le champ « ${missingField.label} » est obligatoire.`
-    return
-  }
-
-  const savedItem = await adminStore.saveItem(
-    props.resourceSlug,
-    isEditing.value ? props.id : null,
-    buildAdminPayload(form),
-  )
-
-  if (savedItem) {
-    referenceStore.invalidate(props.resourceSlug)
-    await router.push({
-      name: 'admin-list',
-      params: { resource: props.resourceSlug },
-    })
-  }
-}
-
-watch(
-  () => [props.resourceSlug, props.id],
-  loadForm,
-  { immediate: true },
-)
+  selectImage,
+  submit,
+  uploading,
+} = useAdminFormView(props)
 </script>
 
 <template>
   <PageContainer>
-    <header>
-      <p class="page-eyebrow">Administration</p>
-      <p class="page-title">
-        {{ isEditing ? 'Modifier' : 'Ajouter' }} — {{ resource?.label ?? 'Référentiel' }}
-      </p>
-      <p class="page-description">Renseignez les informations du référentiel.</p>
-    </header>
+    <PageHeading
+      eyebrow="Administration"
+      :title="`${isEditing ? 'Modifier' : 'Ajouter'} ${resource?.label ?? 'Référentiel'}`"
+      description="Renseignez les informations du référentiel."
+    />
 
     <form v-if="resource" class="form-panel" @submit.prevent="submit">
       <ErrorMessage v-if="displayedError" :message="displayedError" />
       <fieldset class="form-grid" :disabled="loading">
         <legend class="sr-only">Informations de la ressource</legend>
         <template v-for="field in fields" :key="field.key">
+          <div v-if="field.type === 'file'" class="md:col-span-2">
+            <label :for="field.key" class="field-label">{{ field.label }}</label>
+            <input
+              :id="field.key"
+              :key="fileInputKey"
+              type="file"
+              :accept="field.accept"
+              class="field-control cursor-pointer file:mr-4 file:rounded-lg file:border-0 file:bg-chirorg-100 file:px-3 file:py-2 file:font-semibold file:text-chirorg-800"
+              @change="selectImage"
+            />
+            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+              JPEG, PNG ou WebP. 5 Mo maximum. Le texte reste facultatif si une image est fournie.
+            </p>
+            <p v-if="form.imageFile" class="mt-3 text-sm font-medium">
+              Nouvelle image : {{ form.imageFile.name }}
+            </p>
+            <div v-if="form.lienImage" class="mt-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+              <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Image actuelle</p>
+              <img
+                :src="currentImageUrl"
+                alt="Illustration actuelle de la consigne technique"
+                class="max-h-64 w-full rounded-lg bg-white object-contain dark:bg-gray-900"
+              />
+            </div>
+            <BaseButton
+              v-if="form.imageFile || form.lienImage"
+              type="button"
+              variant="secondary"
+              size="sm"
+              class="mt-3"
+              @click="removeImage"
+            >
+              Retirer l’image
+            </BaseButton>
+          </div>
           <BaseSelect
-            v-if="field.type === 'select'"
+            v-else-if="field.type === 'select'"
             v-model="form[field.key]"
             :label="field.label"
             :options="field.options"
             :required="field.required"
+          />
+          <MaterialPicker
+            v-else-if="field.type === 'material-picker'"
+            v-model="form[field.key]"
+            :label="field.label"
+            :options="field.options"
+            :required="field.required"
+            :empty-message="form.chirurgien
+              ? 'Aucun matériel de cette spécialité ne correspond à la recherche.'
+              : 'Sélectionnez d’abord un chirurgien pour afficher les matériels de sa spécialité.'"
           />
           <BaseTextarea
             v-else-if="field.type === 'textarea'"
@@ -151,12 +119,23 @@ watch(
         </template>
       </fieldset>
       <div class="form-actions">
-        <BaseButton type="button" variant="secondary" @click="router.back()">
-          Annuler
+        <BaseButton type="button" variant="secondary" @click="goBack">
+          Retour
         </BaseButton>
-        <BaseButton type="submit" :loading="saving">Enregistrer</BaseButton>
+        <BaseButton type="submit" :loading="saving || uploading">Enregistrer</BaseButton>
       </div>
     </form>
     <ErrorMessage v-else :message="displayedError" />
+
+    <ConfirmationModal
+      :open="confirmationOpen"
+      variant="success"
+      :title="isEditing ? 'Confirmer les modifications' : 'Confirmer la création'"
+      :message="`Voulez-vous ${isEditing ? 'enregistrer les modifications de' : 'créer'} ${resource?.label ?? 'cet élément'} ?`"
+      :confirm-label="isEditing ? 'Enregistrer' : 'Créer'"
+      :loading="saving || uploading"
+      @cancel="cancelConfirmation"
+      @confirm="confirmSubmit"
+    />
   </PageContainer>
 </template>

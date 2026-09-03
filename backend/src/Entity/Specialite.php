@@ -48,11 +48,11 @@ class Specialite
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['specialite:read', 'specialite:list', 'chirurgien:read', 'chirurgien:list', 'liste_materiel:read', 'chirurgie_planifiee:read', 'chirurgie_modele:read', 'chirurgie_modele:list', 'materiel:read', 'materiel:list', 'preparation_materiel:read', 'preparation:read', 'programme:read', 'vue_finale:read'])]
+    #[Groups(['specialite:read', 'specialite:list', 'chirurgien:read', 'chirurgien:list', 'liste_materiel:read', 'liste_materiel:list', 'fiche_technique:list', 'chirurgie_planifiee:read', 'chirurgie_modele:read', 'chirurgie_modele:list', 'materiel:read', 'materiel:list', 'preparation_materiel:read', 'preparation:read', 'programme:read', 'vue_finale:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 100, unique: true)]
-    #[Groups(['specialite:read', 'specialite:list', 'specialite:write', 'chirurgien:read', 'chirurgien:list', 'liste_materiel:read', 'chirurgie_planifiee:read', 'chirurgie_modele:read', 'chirurgie_modele:list', 'materiel:read', 'materiel:list', 'preparation_materiel:read', 'preparation:read', 'programme:read', 'vue_finale:read'])]
+    #[Groups(['specialite:read', 'specialite:list', 'specialite:write', 'chirurgien:read', 'chirurgien:list', 'liste_materiel:read', 'liste_materiel:list', 'fiche_technique:list', 'chirurgie_planifiee:read', 'chirurgie_modele:read', 'chirurgie_modele:list', 'materiel:read', 'materiel:list', 'preparation_materiel:read', 'preparation:read', 'programme:read', 'vue_finale:read'])]
     #[Assert\NotBlank]
     #[Assert\Length(max: 100)]
     private ?string $intitule = null;
